@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowLeft, ArrowRight, Download, FileDown, FilePlus2, Info, Plus, Printer, RotateCcw, Save, ShieldCheck, Trash2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
 import PublicFooter from "@/components/PublicFooter";
@@ -12,10 +12,10 @@ import { trpc } from "@/lib/trpc";
 import SeoMeta from "@/components/SeoMeta";
 import { getDocumentSeo, getDocumentStructuredData } from "@shared/seo";
 import "../styles/document-typography.css";
+import { boundedPreviewZoom, pinchZoomStep, PreviewZoom } from "@/lib/previewZoom";
 
 type DocumentToolProps = { kind: DocumentKind };
 type DocumentTemplate = "modern" | "classic" | "minimal";
-type PreviewZoom = -1 | 0 | 1;
 
 const convertTargets: Record<DocumentKind, DocumentKind[]> = {
   quotation: ["invoice", "receipt", "delivery-note"],
@@ -42,6 +42,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const [template, setTemplate] = useState<DocumentTemplate>("classic");
   const [accentColor, setAccentColor] = useState("#0d7a75");
   const [previewZoom, setPreviewZoom] = useState<PreviewZoom>(0);
+  const pinchState = useRef<{ distance: number; zoom: PreviewZoom } | null>(null);
   const profileQuery = trpc.companyProfile.get.useQuery(undefined, { enabled: isAuthenticated });
   const flashNotice = (message: string) => {
     setNotice(message);
@@ -55,6 +56,21 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const seo = getDocumentSeo(kind);
   const totals = useMemo(() => calculateDocumentTotals(document), [document]);
   const previewZoomLabel = previewZoom === -1 ? "90%" : previewZoom === 1 ? "110%" : "100%";
+  const updatePreviewZoom = (value: number) => setPreviewZoom(boundedPreviewZoom(value));
+  const handlePreviewTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    if (event.touches.length !== 2) return;
+    pinchState.current = { distance: getTouchDistance(event.touches), zoom: previewZoom };
+  };
+  const handlePreviewTouchMove = (event: TouchEvent<HTMLDivElement>) => {
+    if (event.touches.length !== 2 || !pinchState.current) return;
+    event.preventDefault();
+    const nextZoom = pinchZoomStep(pinchState.current.distance, getTouchDistance(event.touches), pinchState.current.zoom);
+    if (nextZoom !== previewZoom) {
+      setPreviewZoom(nextZoom);
+      pinchState.current = { distance: getTouchDistance(event.touches), zoom: nextZoom };
+    }
+  };
+  const clearPreviewPinch = () => { pinchState.current = null; };
 
   useEffect(() => {
     const saved = window.sessionStorage.getItem("toolsThai.convertedDocument");
@@ -214,8 +230,8 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
           </section>
 
           <aside className="document-preview-column">
-            <div className="preview-toolbar print-hide"><span><Info size={15} /> ตัวอย่างเอกสาร</span><div className="preview-toolbar-actions"><div className="preview-zoom-controls" role="group" aria-label="ปรับขนาดตัวอย่างเอกสาร"><button type="button" onClick={() => setPreviewZoom((current) => Math.max(-1, current - 1) as PreviewZoom)} disabled={previewZoom === -1} aria-label="ซูมออก" title="ซูมออก"><ZoomOut size={15} /></button><output aria-live="polite" aria-label={`ขนาดตัวอย่าง ${previewZoomLabel}`}>{previewZoomLabel}</output><button type="button" onClick={() => setPreviewZoom((current) => Math.min(1, current + 1) as PreviewZoom)} disabled={previewZoom === 1} aria-label="ซูมเข้า" title="ซูมเข้า"><ZoomIn size={15} /></button><button type="button" className="zoom-reset-button" onClick={() => setPreviewZoom(0)} disabled={previewZoom === 0} aria-label="รีเซ็ตขนาดตัวอย่าง" title="รีเซ็ตขนาด"><RotateCcw size={14} /></button></div><button type="button" onClick={handlePdfExport} disabled={isExporting}><Download size={15} /> {isExporting ? "กำลังสร้าง" : "PDF"}</button></div></div>
-            <div className="preview-paper-wrap" tabIndex={0} aria-label="ตัวอย่างเอกสาร"><DocumentPreview document={document} accentColor={accentColor} template={template} screenZoom={previewZoom} /></div>
+            <div className="preview-toolbar print-hide"><span><Info size={15} /> ตัวอย่างเอกสาร</span><div className="preview-toolbar-actions"><div className="preview-zoom-controls" role="group" aria-label="ปรับขนาดตัวอย่างเอกสาร"><button type="button" onClick={() => updatePreviewZoom(previewZoom - 1)} disabled={previewZoom === -1} aria-label="ซูมออก" title="ซูมออก"><ZoomOut size={15} /></button><output aria-live="polite" aria-label={`ขนาดตัวอย่าง ${previewZoomLabel}`}>{previewZoomLabel}</output><button type="button" onClick={() => updatePreviewZoom(previewZoom + 1)} disabled={previewZoom === 1} aria-label="ซูมเข้า" title="ซูมเข้า"><ZoomIn size={15} /></button><button type="button" className="zoom-reset-button" onClick={() => setPreviewZoom(0)} disabled={previewZoom === 0} aria-label="รีเซ็ตขนาดตัวอย่าง" title="รีเซ็ตขนาด"><RotateCcw size={14} /></button></div><button type="button" onClick={handlePdfExport} disabled={isExporting}><Download size={15} /> {isExporting ? "กำลังสร้าง" : "PDF"}</button></div></div>
+            <div className="preview-paper-wrap" tabIndex={0} aria-label="ตัวอย่างเอกสาร รองรับการถ่างหรือหุบนิ้วเพื่อซูมบนมือถือ" onTouchStart={handlePreviewTouchStart} onTouchMove={handlePreviewTouchMove} onTouchEnd={clearPreviewPinch} onTouchCancel={clearPreviewPinch}><span className="pinch-zoom-hint print-hide">ถ่างหรือหุบนิ้วสองนิ้วเพื่อซูม</span><DocumentPreview document={document} accentColor={accentColor} template={template} screenZoom={previewZoom} /></div>
             <div className="convert-card print-hide"><div><FilePlus2 size={20} /><span><strong>ทำเอกสารต่อเนื่อง</strong><small>นำข้อมูลชุดนี้ไปสร้างเอกสารถัดไปได้ทันที</small></span></div><div className="convert-buttons">{convertTargets[kind].map((target) => <button type="button" key={target} onClick={() => handleConvert(target)}>{documentMeta[target].title}<ArrowRight size={14} /></button>)}</div></div>
           </aside>
         </div>
@@ -228,3 +244,4 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
 
 function FormField({ label, children }: { label: string; children: React.ReactNode }) { return <label className="form-field"><span>{label}</span>{children}</label>; }
 function CardHeading({ title }: { title: string }) { return <div className="card-heading"><h2>{title}</h2></div>; }
+function getTouchDistance(touches: TouchEvent<HTMLDivElement>["touches"]) { return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY); }
