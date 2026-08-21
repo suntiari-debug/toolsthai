@@ -1,6 +1,7 @@
 export type PreviewZoom = -1 | 0 | 1;
 export type PreviewPan = { x: number; y: number };
 export type PreviewScrollIndicator = { section: "ส่วนบน" | "ส่วนกลาง" | "ส่วนล่าง"; progress: number };
+export type TapPoint = { x: number; y: number; timestamp: number };
 
 export function boundedPreviewZoom(value: number): PreviewZoom {
   if (value >= 1) return 1;
@@ -29,4 +30,11 @@ export function getPreviewScrollIndicator(panY: number, limitY: number): Preview
   if (progress < 34) return { section: "ส่วนบน", progress };
   if (progress < 67) return { section: "ส่วนกลาง", progress };
   return { section: "ส่วนล่าง", progress };
+}
+
+export function isDoubleTap(previous: TapPoint | null, current: TapPoint, maxDelay = 280, maxDistance = 32): boolean {
+  if (!previous) return false;
+  const delay = current.timestamp - previous.timestamp;
+  const distance = Math.hypot(current.x - previous.x, current.y - previous.y);
+  return delay >= 0 && delay <= maxDelay && distance <= maxDistance;
 }

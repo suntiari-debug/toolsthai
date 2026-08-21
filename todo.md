@@ -66,4 +66,7 @@
 - [x] ออกแบบตัวบอกตำแหน่งการเลื่อนของหน้า A4 จากค่า pan เมื่อซูม 110%
 - [x] เพิ่ม scroll indicator ที่เปลี่ยนตามการลากเอกสาร และซ่อนเมื่อไม่ได้ซูมเข้า
 - [x] เพิ่มและรัน browser-level regression สำหรับ scroll indicator พร้อมตรวจ PDF A4
+- [x] กำหนดเกณฑ์ double-tap และการรีเซ็ตซูม/ตำแหน่งที่ไม่ชนกับ pinch หรือการลาก
+- [x] เพิ่ม double-tap เพื่อรีเซ็ต preview เป็น 100% และจุดเริ่มต้น พร้อมคำแนะนำบนมือถือ
+- [x] เพิ่มและรัน browser-level regression สำหรับ double-tap reset พร้อมตรวจ PDF A4
 - [x] บันทึกเวอร์ชันหลังแก้ข้อผิดพลาด companyProfile.get

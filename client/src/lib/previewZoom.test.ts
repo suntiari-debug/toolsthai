@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boundedPreviewZoom, clampPreviewPan, getPreviewScrollIndicator, pinchZoomStep } from "./previewZoom";
+import { boundedPreviewZoom, clampPreviewPan, getPreviewScrollIndicator, isDoubleTap, pinchZoomStep } from "./previewZoom";
 
 describe("preview zoom controls", () => {
   it("limits all requested levels to the supported range", () => {
@@ -32,5 +32,11 @@ describe("preview zoom controls", () => {
     expect(getPreviewScrollIndicator(0, 188)).toEqual({ section: "ส่วนบน", progress: 0 });
     expect(getPreviewScrollIndicator(-94, 188)).toEqual({ section: "ส่วนกลาง", progress: 50 });
     expect(getPreviewScrollIndicator(-188, 188)).toEqual({ section: "ส่วนล่าง", progress: 100 });
+  });
+
+  it("recognizes only two quick nearby taps as a double tap", () => {
+    expect(isDoubleTap({ x: 20, y: 30, timestamp: 100 }, { x: 36, y: 42, timestamp: 280 })).toBe(true);
+    expect(isDoubleTap({ x: 20, y: 30, timestamp: 100 }, { x: 20, y: 30, timestamp: 400 })).toBe(false);
+    expect(isDoubleTap({ x: 20, y: 30, timestamp: 100 }, { x: 80, y: 90, timestamp: 220 })).toBe(false);
   });
 });

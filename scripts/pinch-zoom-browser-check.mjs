@@ -55,6 +55,23 @@ async function dispatchPan(page, selector, startX, startY, endX, endY) {
   }, { selector, startX, startY, endX, endY });
 }
 
+async function dispatchTap(page, selector, x, y) {
+  await page.evaluate(({ selector: targetSelector, x: clientX, y: clientY }) => {
+    const target = document.querySelector(targetSelector);
+    if (!target) throw new Error("Preview target is unavailable");
+    const touch = [new Touch({ identifier: 1, target, clientX, clientY })];
+    const fire = (type, touches) => target.dispatchEvent(new TouchEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      touches,
+      targetTouches: touches,
+      changedTouches: touch,
+    }));
+    fire("touchstart", touch);
+    fire("touchend", []);
+  }, { selector, x, y });
+}
+
 try {
   await page.goto("http://127.0.0.1:3000/quotation", { waitUntil: "networkidle" });
   const wrap = page.locator(".preview-paper-wrap");
@@ -85,15 +102,19 @@ try {
     throw new Error("Scroll indicator thumb did not move with the document pan position");
   }
 
-  await dispatchPinch(page, ".preview-paper-wrap", 124, 90);
+  const tapX = box.x + box.width / 2;
+  const tapY = box.y + 210;
+  await dispatchTap(page, ".preview-paper-wrap", tapX, tapY);
+  await page.waitForTimeout(60);
+  await dispatchTap(page, ".preview-paper-wrap", tapX + 4, tapY + 3);
   await page.waitForTimeout(80);
-  if (await zoomOutput.textContent() !== "100%") throw new Error("Pinch in did not reduce the preview zoom");
+  if (await zoomOutput.textContent() !== "100%") throw new Error("Double tap did not reset the preview zoom");
   const resetPan = await page.locator(".document-preview").evaluate((element) => ({
     x: Number.parseFloat(element.style.getPropertyValue("--preview-pan-x")),
     y: Number.parseFloat(element.style.getPropertyValue("--preview-pan-y")),
   }));
-  if (resetPan.x !== 0 || resetPan.y !== 0) throw new Error("Preview pan did not reset after zooming out");
-  if (await indicator.count() !== 0) throw new Error("Scroll indicator did not hide after leaving the zoomed state");
+  if (resetPan.x !== 0 || resetPan.y !== 0) throw new Error("Preview pan did not reset after double tap");
+  if (await indicator.count() !== 0) throw new Error("Scroll indicator did not hide after double-tap reset");
 
   const hasScroll = await wrap.evaluate((element) => element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight);
   if (hasScroll) throw new Error("Pinch gesture introduced an internal preview scrollbar");
