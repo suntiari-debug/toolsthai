@@ -78,6 +78,12 @@ try {
   if (!(panOffset.x < 0 && panOffset.y < 0 && panOffset.x >= -72 && panOffset.y >= -188)) {
     throw new Error(`One-finger pan did not move the zoomed document within bounds: ${JSON.stringify(panOffset)}`);
   }
+  const indicator = page.locator(".document-scroll-indicator");
+  if (await indicator.count() !== 1) throw new Error("Scroll indicator did not appear while the preview was zoomed in");
+  if (await indicator.locator("strong").textContent() !== "ส่วนกลาง") throw new Error("Scroll indicator did not label the current A4 area as the middle section");
+  if (await indicator.locator("i").evaluate((element) => element.style.left) !== "45%") {
+    throw new Error("Scroll indicator thumb did not move with the document pan position");
+  }
 
   await dispatchPinch(page, ".preview-paper-wrap", 124, 90);
   await page.waitForTimeout(80);
@@ -87,6 +93,7 @@ try {
     y: Number.parseFloat(element.style.getPropertyValue("--preview-pan-y")),
   }));
   if (resetPan.x !== 0 || resetPan.y !== 0) throw new Error("Preview pan did not reset after zooming out");
+  if (await indicator.count() !== 0) throw new Error("Scroll indicator did not hide after leaving the zoomed state");
 
   const hasScroll = await wrap.evaluate((element) => element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight);
   if (hasScroll) throw new Error("Pinch gesture introduced an internal preview scrollbar");

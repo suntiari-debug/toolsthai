@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boundedPreviewZoom, clampPreviewPan, pinchZoomStep } from "./previewZoom";
+import { boundedPreviewZoom, clampPreviewPan, getPreviewScrollIndicator, pinchZoomStep } from "./previewZoom";
 
 describe("preview zoom controls", () => {
   it("limits all requested levels to the supported range", () => {
@@ -26,5 +26,11 @@ describe("preview zoom controls", () => {
     expect(clampPreviewPan({ x: -36, y: -125 }, { x: 70, y: 180 })).toEqual({ x: -36, y: -125 });
     expect(clampPreviewPan({ x: -120, y: -250 }, { x: 70, y: 180 })).toEqual({ x: -70, y: -180 });
     expect(clampPreviewPan({ x: 25, y: 30 }, { x: 70, y: 180 })).toEqual({ x: 0, y: 0 });
+  });
+
+  it("labels the visible A4 area from the vertical pan position", () => {
+    expect(getPreviewScrollIndicator(0, 188)).toEqual({ section: "ส่วนบน", progress: 0 });
+    expect(getPreviewScrollIndicator(-94, 188)).toEqual({ section: "ส่วนกลาง", progress: 50 });
+    expect(getPreviewScrollIndicator(-188, 188)).toEqual({ section: "ส่วนล่าง", progress: 100 });
   });
 });
