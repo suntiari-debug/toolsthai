@@ -33,6 +33,7 @@ export type BusinessDocument = {
   vatRate: number;
   vatMode: "excluded" | "included" | "none";
   note: string;
+  signerName?: string;
   watermark: boolean;
 };
 
@@ -77,6 +78,7 @@ export function createInitialDocument(kind: DocumentKind): BusinessDocument {
     vatRate: 7,
     vatMode: "excluded",
     note: "ขอบพระคุณที่ไว้วางใจใช้บริการ",
+    signerName: "",
     watermark: false,
   };
 }
@@ -97,6 +99,7 @@ export function restoreDocument(payload: string, activeKind: DocumentKind): Busi
   return {
     ...document,
     kind: activeKind,
+    signerName: document.signerName || "",
     company: { ...document.company },
     customer: { ...document.customer },
     items: document.items.map((item) => ({ ...item })),
