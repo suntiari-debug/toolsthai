@@ -1,4 +1,5 @@
 export type PreviewZoom = -1 | 0 | 1;
+export type PreviewPan = { x: number; y: number };
 
 export function boundedPreviewZoom(value: number): PreviewZoom {
   if (value >= 1) return 1;
@@ -12,4 +13,11 @@ export function pinchZoomStep(startDistance: number, currentDistance: number, st
   if (ratio >= 1.15) return boundedPreviewZoom(startZoom + 1);
   if (ratio <= 0.87) return boundedPreviewZoom(startZoom - 1);
   return startZoom;
+}
+
+export function clampPreviewPan(pan: PreviewPan, limit: PreviewPan): PreviewPan {
+  return {
+    x: Math.min(0, Math.max(-Math.abs(limit.x), pan.x)),
+    y: Math.min(0, Math.max(-Math.abs(limit.y), pan.y)),
+  };
 }

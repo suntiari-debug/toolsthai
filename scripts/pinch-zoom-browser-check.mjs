@@ -37,6 +37,24 @@ async function dispatchPinch(page, selector, startDistance, endDistance) {
   }, { selector, startDistance, endDistance });
 }
 
+async function dispatchPan(page, selector, startX, startY, endX, endY) {
+  await page.evaluate(({ selector: targetSelector, startX: fromX, startY: fromY, endX: toX, endY: toY }) => {
+    const target = document.querySelector(targetSelector);
+    if (!target) throw new Error("Preview target is unavailable");
+    const makeTouch = (x, y) => [new Touch({ identifier: 1, target, clientX: x, clientY: y })];
+    const fire = (type, touches) => target.dispatchEvent(new TouchEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      touches,
+      targetTouches: touches,
+      changedTouches: touches,
+    }));
+    fire("touchstart", makeTouch(fromX, fromY));
+    fire("touchmove", makeTouch(toX, toY));
+    fire("touchend", []);
+  }, { selector, startX, startY, endX, endY });
+}
+
 try {
   await page.goto("http://127.0.0.1:3000/quotation", { waitUntil: "networkidle" });
   const wrap = page.locator(".preview-paper-wrap");
@@ -51,9 +69,24 @@ try {
   await page.waitForTimeout(80);
   if (await zoomOutput.textContent() !== "110%") throw new Error("Pinch out did not increase the preview zoom");
 
+  await dispatchPan(page, ".preview-paper-wrap", box.x + box.width / 2, box.y + 260, box.x + box.width / 2 - 55, box.y + 175);
+  await page.waitForTimeout(80);
+  const panOffset = await page.locator(".document-preview").evaluate((element) => ({
+    x: Number.parseFloat(element.style.getPropertyValue("--preview-pan-x")),
+    y: Number.parseFloat(element.style.getPropertyValue("--preview-pan-y")),
+  }));
+  if (!(panOffset.x < 0 && panOffset.y < 0 && panOffset.x >= -72 && panOffset.y >= -188)) {
+    throw new Error(`One-finger pan did not move the zoomed document within bounds: ${JSON.stringify(panOffset)}`);
+  }
+
   await dispatchPinch(page, ".preview-paper-wrap", 124, 90);
   await page.waitForTimeout(80);
   if (await zoomOutput.textContent() !== "100%") throw new Error("Pinch in did not reduce the preview zoom");
+  const resetPan = await page.locator(".document-preview").evaluate((element) => ({
+    x: Number.parseFloat(element.style.getPropertyValue("--preview-pan-x")),
+    y: Number.parseFloat(element.style.getPropertyValue("--preview-pan-y")),
+  }));
+  if (resetPan.x !== 0 || resetPan.y !== 0) throw new Error("Preview pan did not reset after zooming out");
 
   const hasScroll = await wrap.evaluate((element) => element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight);
   if (hasScroll) throw new Error("Pinch gesture introduced an internal preview scrollbar");

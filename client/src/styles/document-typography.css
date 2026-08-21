@@ -358,19 +358,19 @@
 @media (min-width: 481px) and (max-width: 540px) {
   .document-tool-page .document-preview.preview-zoom-out { transform: scale(.49) !important; margin-bottom: -573px !important; }
   .document-tool-page .document-preview.preview-zoom-default { transform: scale(.55) !important; margin-bottom: -505px !important; }
-  .document-tool-page .document-preview.preview-zoom-in { transform: scale(.58) !important; margin-bottom: -472px !important; }
+  .document-tool-page .document-preview.preview-zoom-in { transform: translate3d(var(--preview-pan-x, 0px), var(--preview-pan-y, 0px), 0) scale(.58) !important; margin-bottom: -472px !important; }
 }
 
 @media (min-width: 421px) and (max-width: 480px) {
   .document-tool-page .document-preview.preview-zoom-out { transform: scale(.42) !important; margin-bottom: -651px !important; }
   .document-tool-page .document-preview.preview-zoom-default { transform: scale(.47) !important; margin-bottom: -595px !important; }
-  .document-tool-page .document-preview.preview-zoom-in { transform: scale(.50) !important; margin-bottom: -562px !important; }
+  .document-tool-page .document-preview.preview-zoom-in { transform: translate3d(var(--preview-pan-x, 0px), var(--preview-pan-y, 0px), 0) scale(.50) !important; margin-bottom: -562px !important; }
 }
 
 @media (max-width: 420px) {
   .document-tool-page .document-preview.preview-zoom-out { transform: scale(.35) !important; margin-bottom: -730px !important; }
   .document-tool-page .document-preview.preview-zoom-default { transform: scale(.39) !important; margin-bottom: -685px !important; }
-  .document-tool-page .document-preview.preview-zoom-in { transform: scale(.42) !important; margin-bottom: -651px !important; }
+  .document-tool-page .document-preview.preview-zoom-in { transform: translate3d(var(--preview-pan-x, 0px), var(--preview-pan-y, 0px), 0) scale(.42) !important; margin-bottom: -651px !important; }
 }
 
 @media print {
@@ -406,5 +406,16 @@
     box-shadow: 0 .1rem .35rem rgba(20,33,42,.08);
     font-size: .61rem;
     pointer-events: none;
+  }
+}
+
+@media (max-width: 540px) {
+  .document-tool-page .preview-paper-wrap.preview-pan-enabled {
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .document-tool-page .preview-paper-wrap.preview-pan-enabled:active {
+    cursor: grabbing;
   }
 }

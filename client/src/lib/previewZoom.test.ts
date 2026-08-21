@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boundedPreviewZoom, pinchZoomStep } from "./previewZoom";
+import { boundedPreviewZoom, clampPreviewPan, pinchZoomStep } from "./previewZoom";
 
 describe("preview zoom controls", () => {
   it("limits all requested levels to the supported range", () => {
@@ -20,5 +20,11 @@ describe("preview zoom controls", () => {
 
   it("keeps the current level for small two-finger movements", () => {
     expect(pinchZoomStep(100, 106, 0)).toBe(0);
+  });
+
+  it("keeps one-finger panning within the visible expanded-document bounds", () => {
+    expect(clampPreviewPan({ x: -36, y: -125 }, { x: 70, y: 180 })).toEqual({ x: -36, y: -125 });
+    expect(clampPreviewPan({ x: -120, y: -250 }, { x: 70, y: 180 })).toEqual({ x: -70, y: -180 });
+    expect(clampPreviewPan({ x: 25, y: 30 }, { x: 70, y: 180 })).toEqual({ x: 0, y: 0 });
   });
 });

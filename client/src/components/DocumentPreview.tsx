@@ -1,19 +1,21 @@
 import type { CSSProperties } from "react";
 import { BusinessDocument, calculateDocumentTotals, documentMeta, formatNumber, formatTHB, formatThaiDate, amountToThaiWords } from "@/lib/document";
+import type { PreviewPan } from "@/lib/previewZoom";
 
 type DocumentPreviewProps = {
   document: BusinessDocument;
   accentColor?: string;
   template?: "modern" | "classic" | "minimal";
   screenZoom?: -1 | 0 | 1;
+  screenPan?: PreviewPan;
 };
 
-export default function DocumentPreview({ document, accentColor = "#0d7a75", template = "classic", screenZoom = 0 }: DocumentPreviewProps) {
+export default function DocumentPreview({ document, accentColor = "#0d7a75", template = "classic", screenZoom = 0, screenPan = { x: 0, y: 0 } }: DocumentPreviewProps) {
   const totals = calculateDocumentTotals(document);
   const meta = documentMeta[document.kind];
   const zoomClass = screenZoom === -1 ? "preview-zoom-out" : screenZoom === 1 ? "preview-zoom-in" : "preview-zoom-default";
   return (
-    <article className={`document-preview ${zoomClass}`} id="printable-document" data-template={template} style={{ "--document-accent": accentColor } as CSSProperties}>
+    <article className={`document-preview ${zoomClass}`} id="printable-document" data-template={template} style={{ "--document-accent": accentColor, "--preview-pan-x": `${screenPan.x}px`, "--preview-pan-y": `${screenPan.y}px` } as CSSProperties}>
       {document.watermark && <div className="document-watermark">TOOLS THAI</div>}
       <header className="pdf-header">
         <div className="pdf-company">
