@@ -11,6 +11,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import SeoMeta from "@/components/SeoMeta";
 import { getDocumentSeo, getDocumentStructuredData } from "@shared/seo";
+import "../styles/document-typography.css";
 
 type DocumentToolProps = { kind: DocumentKind };
 type DocumentTemplate = "modern" | "classic" | "minimal";

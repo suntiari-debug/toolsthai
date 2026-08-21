@@ -1,0 +1,193 @@
+.document-tool-page {
+  --document-ui-font: "Sarabun", "Noto Sans Thai", sans-serif;
+  font-family: var(--document-ui-font);
+}
+
+.document-tool-page :is(button, input, select, textarea) {
+  font-family: inherit;
+}
+
+.document-tool-page .workspace-action,
+.document-tool-page .autosave-status,
+.document-tool-page .preview-toolbar,
+.document-tool-page .back-link {
+  font-size: .84rem;
+}
+
+.document-tool-page .button-download {
+  font-size: .88rem;
+  font-weight: 700;
+}
+
+.document-tool-page .card-heading h2 {
+  font-size: 1.18rem;
+  font-weight: 700;
+}
+
+.document-tool-page .design-label,
+.document-tool-page .form-field > span,
+.document-tool-page .tax-toggle-row strong,
+.document-tool-page .tax-static-row strong {
+  font-size: .86rem;
+}
+
+.document-tool-page .template-choice strong {
+  font-size: .88rem;
+}
+
+.document-tool-page .template-choice small,
+.document-tool-page .tax-toggle-row small,
+.document-tool-page .tax-static-row small,
+.document-tool-page .design-hint,
+.document-tool-page .asset-static-tile small,
+.document-tool-page .asset-upload-tile > span:last-of-type {
+  font-size: .72rem;
+}
+
+.document-tool-page .asset-upload-tile strong,
+.document-tool-page .asset-static-tile > span,
+.document-tool-page .item-editor-top,
+.document-tool-page .item-line-total,
+.document-tool-page .draft-link,
+.document-tool-page .add-item-button {
+  font-size: .8rem;
+}
+
+.document-tool-page .form-field input,
+.document-tool-page .form-field textarea,
+.document-tool-page .form-field select {
+  min-height: 2.68rem;
+  font-size: .92rem;
+  line-height: 1.45;
+}
+
+.document-tool-page .form-field textarea {
+  min-height: 4.25rem;
+}
+
+.document-tool-page .document-preview {
+  font-family: "Sarabun", "Noto Sans Thai", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.document-tool-page .pdf-company-name {
+  margin-bottom: .42rem !important;
+  font-size: 1.55rem !important;
+  line-height: 1.18 !important;
+}
+
+.document-tool-page .pdf-company p {
+  font-size: .86rem;
+  line-height: 1.48;
+}
+
+.document-tool-page .pdf-title > p {
+  font-size: 2.12rem;
+  font-weight: 700;
+  line-height: 1.06;
+}
+
+.document-tool-page .pdf-title span {
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: .1em;
+}
+
+.document-tool-page .pdf-section-label {
+  font-size: .72rem;
+  letter-spacing: .05em;
+}
+
+.document-tool-page .pdf-customer-name {
+  margin-top: .45rem !important;
+  margin-bottom: .28rem !important;
+  font-size: 1.08rem !important;
+  line-height: 1.24 !important;
+}
+
+.document-tool-page .pdf-customer-section p:not(.pdf-section-label) {
+  font-size: .86rem;
+  line-height: 1.48;
+}
+
+.document-tool-page .pdf-document-meta {
+  gap: .46rem;
+}
+
+.document-tool-page .pdf-document-meta > div {
+  font-size: .8rem;
+  line-height: 1.35;
+}
+
+.document-tool-page .pdf-document-meta strong {
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.document-tool-page .pdf-items-table {
+  font-size: .84rem;
+}
+
+.document-tool-page .pdf-items-table th {
+  padding: .72rem .62rem;
+  font-size: .8rem;
+  font-weight: 700;
+}
+
+.document-tool-page .pdf-items-table td {
+  padding: .76rem .62rem;
+  line-height: 1.4;
+}
+
+.document-tool-page .pdf-items-table td strong {
+  font-size: .88rem;
+  font-weight: 600;
+}
+
+.document-tool-page .pdf-items-table td small {
+  margin-top: .18rem;
+  font-size: .72rem;
+}
+
+.document-tool-page .pdf-note p,
+.document-tool-page .pdf-totals > div {
+  font-size: .86rem;
+  line-height: 1.45;
+}
+
+.document-tool-page .pdf-amount-words {
+  font-size: .92rem !important;
+  line-height: 1.45;
+}
+
+.document-tool-page .pdf-grand-total strong {
+  font-size: 1.42rem;
+  font-weight: 700;
+}
+
+.document-tool-page .pdf-signatures div {
+  font-size: .86rem;
+}
+
+.document-tool-page .pdf-signatures small {
+  font-size: .76rem;
+}
+
+@media (max-width: 540px) {
+  .document-tool-page .workspace-action,
+  .document-tool-page .autosave-status,
+  .document-tool-page .preview-toolbar,
+  .document-tool-page .back-link {
+    font-size: .77rem;
+  }
+
+  .document-tool-page .card-heading h2 {
+    font-size: 1.14rem;
+  }
+
+  .document-tool-page .form-field input,
+  .document-tool-page .form-field textarea,
+  .document-tool-page .form-field select {
+    font-size: .9rem;
+  }
+}
