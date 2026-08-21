@@ -5,13 +5,15 @@ type DocumentPreviewProps = {
   document: BusinessDocument;
   accentColor?: string;
   template?: "modern" | "classic" | "minimal";
+  screenZoom?: -1 | 0 | 1;
 };
 
-export default function DocumentPreview({ document, accentColor = "#0d7a75", template = "classic" }: DocumentPreviewProps) {
+export default function DocumentPreview({ document, accentColor = "#0d7a75", template = "classic", screenZoom = 0 }: DocumentPreviewProps) {
   const totals = calculateDocumentTotals(document);
   const meta = documentMeta[document.kind];
+  const zoomClass = screenZoom === -1 ? "preview-zoom-out" : screenZoom === 1 ? "preview-zoom-in" : "preview-zoom-default";
   return (
-    <article className="document-preview" id="printable-document" data-template={template} style={{ "--document-accent": accentColor } as CSSProperties}>
+    <article className={`document-preview ${zoomClass}`} id="printable-document" data-template={template} style={{ "--document-accent": accentColor } as CSSProperties}>
       {document.watermark && <div className="document-watermark">TOOLS THAI</div>}
       <header className="pdf-header">
         <div className="pdf-company">
