@@ -37,4 +37,8 @@
 - [x] เพิ่ม browser-level regression test สำหรับผู้ใช้ล็อกอินที่ companyProfile.get คืน null และตรวจว่าไม่มี console/API query error บนหน้า Quotation
 - [x] รัน browser-level regression test ของ company profile และบันทึกผลตรวจรับก่อนสร้าง checkpoint
 - [x] บันทึกผล browser-level regression สำหรับผู้ใช้ล็อกอินที่ companyProfile.get คืน null ลงในเอกสารตรวจรับ
+- [x] ตรวจสาเหตุ scrollbar ในพื้นที่ตัวอย่างเอกสารของหน้า Quotation บนเดสก์ท็อปและมือถือ
+- [x] ปรับพื้นที่ตัวอย่างเอกสารให้ไม่แสดง scrollbar ที่ไม่จำเป็น โดยคง preview และ export PDF ให้ทำงานถูกต้อง
+- [x] ทดสอบ preview และการดาวน์โหลด PDF หลังปรับ scrollbar
+- [x] บันทึกเวอร์ชันหลังแก้ scrollbar ของตัวอย่างเอกสาร
 - [x] บันทึกเวอร์ชันหลังแก้ข้อผิดพลาด companyProfile.get
