@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import PublicFooter from "@/components/PublicFooter";
 import PublicHeader from "@/components/PublicHeader";
+import SeoMeta from "@/components/SeoMeta";
 
 const documentTools = [
   { href: "/quotation", icon: FileCheck2, title: "ใบเสนอราคา", description: "เริ่มต้นการขายด้วยเอกสารที่ชัดเจนและน่าเชื่อถือ", accent: "coral" },
@@ -22,6 +23,7 @@ const calculatorTools = [
 export default function Home() {
   return (
     <div className="app-page home-page">
+      <SeoMeta title="Tools Thai | เครื่องมือธุรกิจไทย ใช้งานฟรี" description="Tools Thai รวมเครื่องมือสร้างเอกสารธุรกิจและคำนวณตัวเลขสำคัญสำหรับธุรกิจไทย ใช้งานฟรีและเริ่มทำงานได้ทันที" canonicalPath="/" />
       <PublicHeader />
       <main>
         <section className="hero shell">

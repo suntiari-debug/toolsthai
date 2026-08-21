@@ -1,16 +1,16 @@
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowLeft, ArrowRight, Download, FileDown, FilePlus2, Info, Plus, Save, ShieldCheck, Trash2, Upload, WandSparkles } from "lucide-react";
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
 import PublicFooter from "@/components/PublicFooter";
 import PublicHeader from "@/components/PublicHeader";
 import DocumentPreview from "@/components/DocumentPreview";
+import DocumentSeoContent from "@/components/DocumentSeoContent";
 import { BusinessDocument, DocumentKind, LineItem, calculateDocumentTotals, convertDocument, createInitialDocument, documentMeta, formatTHB, makeDocumentNumber, restoreDocument } from "@/lib/document";
 import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import SeoMeta from "@/components/SeoMeta";
+import { getDocumentSeo, getDocumentStructuredData } from "@shared/seo";
 
 type DocumentToolProps = { kind: DocumentKind };
 
@@ -38,6 +38,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     onError: () => flashNotice("ไม่สามารถบันทึกเอกสารได้ กรุณาลองใหม่อีกครั้ง"),
   });
   const meta = documentMeta[kind];
+  const seo = getDocumentSeo(kind);
   const totals = useMemo(() => calculateDocumentTotals(document), [document]);
 
   useEffect(() => {
@@ -72,6 +73,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     if (!printable || isExporting) return;
     setIsExporting(true);
     try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
       const canvas = await html2canvas(printable, {
         backgroundColor: "#ffffff",
         scale: 2.5,
@@ -123,11 +125,11 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
 
   return (
     <div className="app-page document-tool-page">
-      <SeoMeta title={`${meta.title} ออนไลน์ฟรี`} description={`${meta.intro} สร้างและดาวน์โหลดเป็น PDF ได้ฟรีด้วย Tools Thai`} />
+      <SeoMeta title={seo?.title || `${meta.title} ออนไลน์ฟรี`} description={seo?.description || `${meta.intro} สร้างและดาวน์โหลดเป็น PDF ได้ฟรีด้วย Tools Thai`} canonicalPath={seo?.path || `/${kind}`} structuredData={getDocumentStructuredData(kind)} />
       <PublicHeader />
       <main className="document-workspace">
         <div className="shell document-topbar print-hide">
-          <div><Link href="/tools" className="back-link"><ArrowLeft size={16} /> เครื่องมือทั้งหมด</Link><p className="page-kicker">DOCUMENT BUILDER</p><h1>{meta.title}</h1><p>{meta.intro} ใช้งานฟรีโดยไม่ต้องสมัครสมาชิก</p></div>
+          <div><Link href="/tools" className="back-link"><ArrowLeft size={16} /> เครื่องมือทั้งหมด</Link><p className="page-kicker">DOCUMENT BUILDER</p><h1>{seo?.h1 || meta.title}</h1><p>{seo?.intro || `${meta.intro} ใช้งานฟรีโดยไม่ต้องสมัครสมาชิก`}</p></div>
           <div className="document-top-actions"><button type="button" className="text-icon-button" onClick={handleAccountSave} disabled={saveDocument.isPending}><Save size={16} /> {isAuthenticated ? (saveDocument.isPending ? "กำลังบันทึก..." : "บันทึกเข้าบัญชี") : "เข้าสู่ระบบเพื่อบันทึก"}</button><button type="button" className="button button-primary" onClick={handlePdfExport} disabled={isExporting}><FileDown size={17} /> {isExporting ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button></div>
         </div>
         {notice && <div className="draft-toast print-hide"><ShieldCheck size={17} /> {notice}</div>}
@@ -165,6 +167,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
             <div className="convert-card print-hide"><div><FilePlus2 size={20} /><span><strong>ทำเอกสารต่อเนื่อง</strong><small>นำข้อมูลชุดนี้ไปสร้างเอกสารถัดไปได้ทันที</small></span></div><div className="convert-buttons">{convertTargets[kind].map((target) => <button type="button" key={target} onClick={() => handleConvert(target)}>{documentMeta[target].title}<ArrowRight size={14} /></button>)}</div></div>
           </aside>
         </div>
+        <DocumentSeoContent kind={kind} />
       </main>
       <PublicFooter />
     </div>

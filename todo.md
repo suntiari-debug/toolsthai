@@ -26,3 +26,8 @@
 - [x] เพิ่ม Vitest สำหรับการแปลง quotation เป็น receipt และ delivery note โดยตรวจการคงข้อมูลสำคัญและเลขเอกสารใหม่
 - [x] ตรวจ flow การ restore payload ที่แปลงแล้วในหน้าปลายทางให้ตรงกับข้อมูลที่บันทึกไว้
 - [x] ทดสอบ flow จริงจาก quotation ไปยัง route ปลายทาง โดยยืนยันการ restore เลขเอกสาร บริษัท ลูกค้า และรายการจาก session storage
+- [x] ตรวจสอบ route และส่วนประกอบปัจจุบันที่มีผลต่อ SSR และ metadata ของหน้า Quotation กับ Invoice
+- [x] ทำให้หน้า public ของ Quotation และ Invoice ส่งเนื้อหา SEO และ metadata เฉพาะหน้าให้ crawler เห็นตั้งแต่ response แรก
+- [x] เพิ่มเนื้อหา How-to, FAQ, internal links และ structured data ที่สอดคล้องกับฟีเจอร์จริงของ Quotation และ Invoice
+- [x] ทดสอบ TypeScript, Vitest, rendering, metadata และ crawler-visible HTML ของสองหน้า
+- [x] บันทึกเวอร์ชัน SEO ของ Tools Thai หลังตรวจรับผ่าน
