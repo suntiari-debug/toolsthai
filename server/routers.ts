@@ -38,7 +38,7 @@ export const appRouter = router({
     }),
   }),
   companyProfile: router({
-    get: protectedProcedure.query(({ ctx }) => db.getCompanyProfile(ctx.user.id)),
+    get: protectedProcedure.query(async ({ ctx }) => (await db.getCompanyProfile(ctx.user.id)) ?? null),
     save: protectedProcedure.input(companyProfileInput).mutation(async ({ ctx, input }) => {
       let logoUrl = input.existingLogoUrl || null;
       if (input.logoDataUrl) {

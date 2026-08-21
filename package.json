@@ -11,6 +11,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "verify:ssr": "bash scripts/verify-ssr.sh",
+    "check:company-profile": "node scripts/company-profile-browser-check.mjs",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {

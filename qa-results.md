@@ -25,3 +25,7 @@
 ## Document Conversion Flow
 
 ทดสอบผ่านเบราว์เซอร์จริงจากหน้าใบเสนอราคาไปยังใบแจ้งหนี้ ใบเสร็จรับเงิน และใบส่งของ โดยระบบสร้างเลขเอกสารใหม่ที่มี prefix ถูกต้อง (`IV`, `RC`, `DN`) และ restore ชื่อบริษัท ชื่อลูกค้า และรายการสินค้าจาก session storage ครบถ้วนในหน้าปลายทางทุกกรณี
+
+## Company Profile Null-State Regression — 21 August 2026
+
+ทดสอบด้วย Chromium headless บนหน้า `/quotation` โดยจำลองผู้ใช้ที่ล็อกอินและให้ `companyProfile.get` ส่งค่า `null` ผลการทดสอบยืนยันว่าปุ่ม **บันทึกเข้าบัญชี** แสดงสำหรับผู้ใช้ที่ล็อกอินตามปกติ ปุ่ม **ใช้ template ที่บันทึก** ไม่แสดงเมื่อยังไม่มี template บริษัท และไม่มี console error หรือ API query error ที่มีข้อความ `Query data cannot be undefined` หรือ `companyProfile` เกิดขึ้น

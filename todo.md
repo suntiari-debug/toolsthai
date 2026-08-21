@@ -31,3 +31,10 @@
 - [x] เพิ่มเนื้อหา How-to, FAQ, internal links และ structured data ที่สอดคล้องกับฟีเจอร์จริงของ Quotation และ Invoice
 - [x] ทดสอบ TypeScript, Vitest, rendering, metadata และ crawler-visible HTML ของสองหน้า
 - [x] บันทึกเวอร์ชัน SEO ของ Tools Thai หลังตรวจรับผ่าน
+- [x] ตรวจสอบและแก้ companyProfile.get เพื่อไม่ให้คืนค่า undefined เมื่อผู้ใช้ยังไม่มี template บริษัท
+- [x] ปรับหน้า Quotation ให้รองรับผลลัพธ์ไม่มี template บริษัทโดยไม่สร้าง API query error
+- [x] เพิ่ม regression test และตรวจสอบ flow ผู้ใช้ล็อกอินบนหน้า Quotation
+- [x] เพิ่ม browser-level regression test สำหรับผู้ใช้ล็อกอินที่ companyProfile.get คืน null และตรวจว่าไม่มี console/API query error บนหน้า Quotation
+- [x] รัน browser-level regression test ของ company profile และบันทึกผลตรวจรับก่อนสร้าง checkpoint
+- [x] บันทึกผล browser-level regression สำหรับผู้ใช้ล็อกอินที่ companyProfile.get คืน null ลงในเอกสารตรวจรับ
+- [x] บันทึกเวอร์ชันหลังแก้ข้อผิดพลาด companyProfile.get
