@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountToThaiWords, calculateDocumentTotals, convertDocument, createInitialDocument, restoreDocument } from "./document";
+import { amountToThaiWords, boundedStampPosition, boundedStampScale, calculateDocumentTotals, convertDocument, createInitialDocument, restoreDocument } from "./document";
 
 describe("document calculations", () => {
   it("calculates an excluded VAT document with discount", () => {
@@ -35,6 +35,13 @@ describe("document calculations", () => {
     expect(amountToThaiWords(0)).toBe("ศูนย์บาทถ้วน");
   });
 
+  it("limits the stamp transform to the signature artwork area", () => {
+    expect(boundedStampPosition({ x: -20, y: 120 })).toEqual({ x: 16, y: 82 });
+    expect(boundedStampPosition({ x: 52.34, y: 46.66 })).toEqual({ x: 52.3, y: 46.7 });
+    expect(boundedStampScale(.1)).toBe(.6);
+    expect(boundedStampScale(2.5)).toBe(1.7);
+  });
+
   it("converts a quotation to every downstream document while preserving company, customer, and items", () => {
     const quotation = createInitialDocument("quotation");
     quotation.documentNumber = "QT-202608-008";
@@ -42,6 +49,8 @@ describe("document calculations", () => {
     quotation.customer.name = "ลูกค้าทดสอบ";
     quotation.signatureUrl = "/manus-storage/company-signatures/signature.png";
     quotation.stampUrl = "/manus-storage/company-stamps/stamp.png";
+    quotation.stampPosition = { x: 60, y: 44 };
+    quotation.stampScale = 1.35;
     quotation.items = [{ id: "item-1", name: "บริการออกแบบ", description: "งานเดือนสิงหาคม", quantity: 2, unit: "ชั่วโมง", unitPrice: 1500 }];
     const targets = [
       ["invoice", "IV"],
@@ -58,6 +67,8 @@ describe("document calculations", () => {
       expect(converted.items).not.toBe(quotation.items);
       expect(converted.signatureUrl).toBe(quotation.signatureUrl);
       expect(converted.stampUrl).toBe(quotation.stampUrl);
+      expect(converted.stampPosition).toEqual({ x: 60, y: 44 });
+      expect(converted.stampScale).toBe(1.35);
     }
   });
 
@@ -67,6 +78,8 @@ describe("document calculations", () => {
     quotation.customer.name = "ลูกค้าทดสอบ";
     quotation.signatureUrl = "/manus-storage/company-signatures/signature.png";
     quotation.stampUrl = "/manus-storage/company-stamps/stamp.png";
+    quotation.stampPosition = { x: 60, y: 44 };
+    quotation.stampScale = 1.35;
     quotation.items = [{ id: "item-2", name: "บริการรายเดือน", description: "สิงหาคม", quantity: 1, unit: "เดือน", unitPrice: 2500 }];
     const converted = convertDocument(quotation, "receipt");
     const restored = restoreDocument(JSON.stringify(converted), "receipt");
@@ -74,5 +87,7 @@ describe("document calculations", () => {
     expect(restored.documentNumber).toMatch(/^RC-/);
     expect(restored.signatureUrl).toBe("/manus-storage/company-signatures/signature.png");
     expect(restored.stampUrl).toBe("/manus-storage/company-stamps/stamp.png");
+    expect(restored.stampPosition).toEqual({ x: 60, y: 44 });
+    expect(restored.stampScale).toBe(1.35);
   });
 });

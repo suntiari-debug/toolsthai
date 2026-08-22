@@ -9,6 +9,18 @@ export type LineItem = {
   unitPrice: number;
 };
 
+export type StampPosition = { x: number; y: number };
+export const defaultStampPosition: StampPosition = { x: 78, y: 72 };
+export const defaultStampScale = 1;
+
+export function boundedStampPosition(position: StampPosition): StampPosition {
+  return { x: Math.round(Math.min(88, Math.max(16, Number(position.x) || defaultStampPosition.x)) * 10) / 10, y: Math.round(Math.min(82, Math.max(18, Number(position.y) || defaultStampPosition.y)) * 10) / 10 };
+}
+
+export function boundedStampScale(scale: number) {
+  return Math.round(Math.min(1.7, Math.max(.6, Number(scale) || defaultStampScale)) * 100) / 100;
+}
+
 export type BusinessDocument = {
   kind: DocumentKind;
   documentNumber: string;
@@ -36,6 +48,8 @@ export type BusinessDocument = {
   signerName?: string;
   signatureUrl?: string;
   stampUrl?: string;
+  stampPosition?: StampPosition;
+  stampScale?: number;
   watermark: boolean;
 };
 
@@ -83,6 +97,8 @@ export function createInitialDocument(kind: DocumentKind): BusinessDocument {
     signerName: "",
     signatureUrl: "",
     stampUrl: "",
+    stampPosition: { ...defaultStampPosition },
+    stampScale: defaultStampScale,
     watermark: false,
   };
 }
@@ -106,6 +122,8 @@ export function restoreDocument(payload: string, activeKind: DocumentKind): Busi
     signerName: document.signerName || "",
     signatureUrl: document.signatureUrl || "",
     stampUrl: document.stampUrl || "",
+    stampPosition: boundedStampPosition(document.stampPosition || defaultStampPosition),
+    stampScale: boundedStampScale(document.stampScale || defaultStampScale),
     company: { ...document.company },
     customer: { ...document.customer },
     items: document.items.map((item) => ({ ...item })),
