@@ -342,6 +342,24 @@
 }
 
 /* Screen-only preview scale. The printable A4 layout remains unscaled by print rules. */
+@media (min-width: 821px) {
+  /* `.app-page` normally clips overflow, which prevents sticky descendants from following page scroll. */
+  .document-tool-page.app-page {
+    overflow: visible;
+  }
+
+  .document-tool-page .reference-document-grid {
+    align-items: start;
+  }
+
+  .document-tool-page .document-preview-column {
+    position: sticky;
+    top: 5.25rem;
+    align-self: start;
+    z-index: 2;
+  }
+}
+
 @media (min-width: 1061px) {
   .document-tool-page .preview-paper-wrap {
     padding: .85rem;
