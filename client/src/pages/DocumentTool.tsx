@@ -1,6 +1,6 @@
 import { ChangeEvent, type CSSProperties, TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, ArrowRight, Download, Eye, EyeOff, FileDown, FilePlus2, Info, Plus, Printer, RotateCcw, Save, ShieldCheck, Trash2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Eye, EyeOff, FileDown, FilePlus2, Info, Plus, Printer, RotateCcw, Save, ShieldCheck, Trash2, Undo2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
 import PublicFooter from "@/components/PublicFooter";
 import PublicHeader from "@/components/PublicHeader";
 import DocumentPreview from "@/components/DocumentPreview";
@@ -13,14 +13,16 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import SeoMeta from "@/components/SeoMeta";
 import { getDocumentSeo, getDocumentStructuredData } from "@shared/seo";
-import { isTemporaryDocumentAssetUrl, validateDocumentAssetFile } from "@/lib/documentAssets";
+import { isTemporaryDocumentAssetUrl, readDocumentAssetAsDataUrl, validateDocumentAssetFile } from "@/lib/documentAssets";
 import { getDocumentValidationIssues } from "@/lib/documentValidation";
+import { LOGO_PRESETS_STORAGE_KEY, MAX_LOGO_PRESETS, parseStoredPreviewHighlight, PREVIEW_HIGHLIGHT_PREFERENCE_STORAGE_KEY, sanitizeLogoPresets, serializeLogoPresets, type LogoPreset } from "@/lib/documentPreferences";
 import { getItemPreviewHighlightTarget, getPreviewHighlightTarget, type PreviewHighlightTarget } from "@/lib/previewHighlight";
 import "../styles/document-typography.css";
 import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollBehavior, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
 
 type DocumentToolProps = { kind: DocumentKind };
 type DocumentTemplate = "modern" | "classic" | "minimal";
+type RemovedLogo = { logoUrl: string; position: { x: number; y: number }; scale: number; crop: NonNullable<BusinessDocument["logoCrop"]> };
 
 const convertTargets: Record<DocumentKind, DocumentKind[]> = {
   quotation: ["invoice", "receipt", "delivery-note"],
@@ -53,9 +55,14 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const [previewZoomDevice, setPreviewZoomDevice] = useState<PreviewZoomDevice>(() => typeof window === "undefined" ? "desktop" : getPreviewZoomDevice(window.innerWidth));
   const [activePreviewHighlight, setActivePreviewHighlight] = useState<PreviewHighlightTarget | null>(null);
   const [isPreviewHighlightEnabled, setIsPreviewHighlightEnabled] = useState(true);
+  const [isPreviewHighlightRestored, setIsPreviewHighlightRestored] = useState(false);
   const [isPdfValidationOpen, setIsPdfValidationOpen] = useState(false);
   const [isLogoRemoveOpen, setIsLogoRemoveOpen] = useState(false);
   const [isLogoEditorOpen, setIsLogoEditorOpen] = useState(false);
+  const [lastRemovedLogo, setLastRemovedLogo] = useState<RemovedLogo | null>(null);
+  const [logoPresets, setLogoPresets] = useState<LogoPreset[]>([]);
+  const [logoPresetName, setLogoPresetName] = useState("");
+  const [isLogoPresetsRestored, setIsLogoPresetsRestored] = useState(false);
   const pinchState = useRef<{ distance: number; zoom: PreviewZoom } | null>(null);
   const panState = useRef<{ clientX: number; clientY: number; pan: PreviewPan } | null>(null);
   const singleTouchState = useRef<{ x: number; y: number; moved: boolean } | null>(null);
@@ -92,6 +99,40 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     window.addEventListener("resize", syncPreviewZoomDevice);
     return () => window.removeEventListener("resize", syncPreviewZoomDevice);
   }, []);
+  useEffect(() => {
+    try {
+      setIsPreviewHighlightEnabled(parseStoredPreviewHighlight(window.localStorage.getItem(PREVIEW_HIGHLIGHT_PREFERENCE_STORAGE_KEY)));
+    } catch {
+      // The default stays enabled if browser storage is unavailable.
+    } finally {
+      setIsPreviewHighlightRestored(true);
+    }
+  }, []);
+  useEffect(() => {
+    if (!isPreviewHighlightRestored) return;
+    try {
+      window.localStorage.setItem(PREVIEW_HIGHLIGHT_PREFERENCE_STORAGE_KEY, String(isPreviewHighlightEnabled));
+    } catch {
+      // The current preview remains usable if browser storage is blocked.
+    }
+  }, [isPreviewHighlightEnabled, isPreviewHighlightRestored]);
+  useEffect(() => {
+    try {
+      setLogoPresets(sanitizeLogoPresets(window.localStorage.getItem(LOGO_PRESETS_STORAGE_KEY)));
+    } catch {
+      setLogoPresets([]);
+    } finally {
+      setIsLogoPresetsRestored(true);
+    }
+  }, []);
+  useEffect(() => {
+    if (!isLogoPresetsRestored) return;
+    try {
+      window.localStorage.setItem(LOGO_PRESETS_STORAGE_KEY, serializeLogoPresets(logoPresets));
+    } catch {
+      flashNotice("ไม่สามารถบันทึก preset โลโก้ในอุปกรณ์นี้ได้");
+    }
+  }, [isLogoPresetsRestored, logoPresets]);
   useEffect(() => {
     setIsPreviewZoomRestored(false);
     try {
@@ -221,20 +262,62 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const addItem = () => setDocument((current) => ({ ...current, items: [...current.items, { id: crypto.randomUUID(), name: "สินค้า / บริการ", description: "", quantity: 1, unit: "รายการ", unitPrice: 0 }] }));
   const removeItem = (id: string) => setDocument((current) => current.items.length === 1 ? current : { ...current, items: current.items.filter((item) => item.id !== id) });
 
-  const handleLogo = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleLogo = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
+    const validation = validateDocumentAssetFile(file, "โลโก้");
+    if (!validation.valid) { flashNotice(validation.message); return; }
+    if (!file) return;
+    setLastRemovedLogo((previous) => {
+      if (previous && isTemporaryDocumentAssetUrl(previous.logoUrl)) URL.revokeObjectURL(previous.logoUrl);
+      return null;
+    });
     if (isTemporaryDocumentAssetUrl(document.company.logoUrl)) URL.revokeObjectURL(document.company.logoUrl);
-    const logoUrl = URL.createObjectURL(file);
-    setDocument((current) => ({ ...current, company: { ...current.company, logoUrl }, logoPosition: { ...defaultLogoPosition }, logoScale: defaultLogoScale, logoCrop: { ...defaultLogoCrop } }));
-    setIsLogoEditorOpen(true);
-    event.target.value = "";
+    try {
+      const logoUrl = await readDocumentAssetAsDataUrl(file);
+      setDocument((current) => ({ ...current, company: { ...current.company, logoUrl }, logoPosition: { ...defaultLogoPosition }, logoScale: defaultLogoScale, logoCrop: { ...defaultLogoCrop } }));
+      setIsLogoEditorOpen(true);
+    } catch {
+      flashNotice("ไม่สามารถอ่านไฟล์โลโก้ได้ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      event.target.value = "";
+    }
   };
   const removeLogo = () => {
-    if (isTemporaryDocumentAssetUrl(document.company.logoUrl)) URL.revokeObjectURL(document.company.logoUrl);
+    const removedLogo: RemovedLogo = { logoUrl: document.company.logoUrl, position: boundedLogoPosition(document.logoPosition || defaultLogoPosition), scale: boundedLogoScale(document.logoScale || defaultLogoScale), crop: boundedLogoCrop(document.logoCrop) };
+    setLastRemovedLogo((previous) => {
+      if (previous && previous.logoUrl !== removedLogo.logoUrl && isTemporaryDocumentAssetUrl(previous.logoUrl)) URL.revokeObjectURL(previous.logoUrl);
+      return removedLogo;
+    });
     setDocument((current) => ({ ...current, company: { ...current.company, logoUrl: "" }, logoPosition: { ...defaultLogoPosition }, logoScale: defaultLogoScale, logoCrop: { ...defaultLogoCrop } }));
     setIsLogoRemoveOpen(false);
-    flashNotice("ลบโลโก้ออกจากเอกสารนี้แล้ว");
+    flashNotice("ลบโลโก้ออกจากเอกสารนี้แล้ว คุณสามารถกู้คืนได้ทันที");
+  };
+  const undoRemoveLogo = () => {
+    if (!lastRemovedLogo) return;
+    setDocument((current) => ({ ...current, company: { ...current.company, logoUrl: lastRemovedLogo.logoUrl }, logoPosition: lastRemovedLogo.position, logoScale: lastRemovedLogo.scale, logoCrop: lastRemovedLogo.crop }));
+    setLastRemovedLogo(null);
+    flashNotice("กู้คืนโลโก้และการปรับแต่งเดิมแล้ว");
+  };
+  const saveLogoPreset = () => {
+    const name = logoPresetName.trim();
+    if (!document.company.logoUrl || !name) return;
+    const preset: LogoPreset = { id: crypto.randomUUID(), name, logoUrl: document.company.logoUrl, crop: boundedLogoCrop(document.logoCrop), position: boundedLogoPosition(document.logoPosition || defaultLogoPosition), scale: boundedLogoScale(document.logoScale || defaultLogoScale) };
+    setLogoPresets((current) => [preset, ...current.filter((item) => item.name.toLocaleLowerCase("th-TH") !== name.toLocaleLowerCase("th-TH"))].slice(0, MAX_LOGO_PRESETS));
+    setLogoPresetName("");
+    flashNotice(`บันทึก “${name}” เป็น preset โลโก้แล้ว`);
+  };
+  const applyLogoPreset = (preset: LogoPreset) => {
+    setLastRemovedLogo((previous) => {
+      if (previous && isTemporaryDocumentAssetUrl(previous.logoUrl)) URL.revokeObjectURL(previous.logoUrl);
+      return null;
+    });
+    if (isTemporaryDocumentAssetUrl(document.company.logoUrl)) URL.revokeObjectURL(document.company.logoUrl);
+    setDocument((current) => ({ ...current, company: { ...current.company, logoUrl: preset.logoUrl }, logoCrop: preset.crop, logoPosition: preset.position, logoScale: preset.scale }));
+    flashNotice(`ใช้โลโก้ “${preset.name}” แล้ว`);
+  };
+  const removeLogoPreset = (presetId: string) => {
+    setLogoPresets((current) => current.filter((preset) => preset.id !== presetId));
+    flashNotice("ลบ preset โลโก้ออกจากอุปกรณ์นี้แล้ว");
   };
   const updateLogoCrop = (update: Partial<BusinessDocument["logoCrop"]>) => setDocument((current) => ({ ...current, logoCrop: boundedLogoCrop({ ...current.logoCrop, ...update }) }));
   const handleDocumentAsset = (event: ChangeEvent<HTMLInputElement>, field: "signatureUrl" | "stampUrl", label: string) => {
@@ -361,9 +444,15 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
                 <div className="document-assets-row">
                   <div className="asset-upload-tile" data-preview-highlight="company"><span className="asset-preview">{document.company.logoUrl ? <img src={document.company.logoUrl} alt="ตัวอย่างโลโก้" /> : <WandSparkles size={18} />}</span><strong>โลโก้</strong><label className="asset-upload-action"><Upload size={13} /> {document.company.logoUrl ? "เปลี่ยนรูป" : "อัปโหลด"}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogo} /></label>{document.company.logoUrl && <><button type="button" className="asset-edit-button" onClick={() => setIsLogoEditorOpen(true)}>ปรับแต่ง</button><AlertDialog open={isLogoRemoveOpen} onOpenChange={setIsLogoRemoveOpen}><AlertDialogTrigger asChild><button type="button" className="asset-remove-button">ลบรูป</button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ลบโลโก้ออกจากเอกสารนี้?</AlertDialogTitle><AlertDialogDescription>โลโก้จะหายจากตัวอย่างเอกสารและ PDF ปัจจุบัน แต่จะไม่ลบไฟล์ต้นฉบับที่เก็บอยู่ใน template บริษัท</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>ยกเลิก</AlertDialogCancel><AlertDialogAction onClick={removeLogo}>ลบโลโก้</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>}</div>
                   <DocumentAssetTile label="ลายเซ็น" previewUrl={document.signatureUrl || ""} previewHighlight="signature" onChange={(event) => handleDocumentAsset(event, "signatureUrl", "ลายเซ็น")} onRemove={() => removeDocumentAsset("signatureUrl", "ลายเซ็น")} />
-                  <DocumentAssetTile label="ตรายาง" previewUrl={document.stampUrl || ""} previewHighlight="signature" onChange={(event) => handleDocumentAsset(event, "stampUrl", "ตรายาง")} onRemove={() => removeDocumentAsset("stampUrl", "ตรายาง")} />
-                </div>
-                {document.company.logoUrl && <div className="logo-transform-controls" data-preview-highlight="company"><div><strong>ขนาดและตำแหน่งโลโก้</strong><span>ปรับผลที่แสดงในหัวเอกสารและ PDF ได้ทันที</span></div><label>ขนาด <input type="range" min="0.65" max="1.45" step="0.05" value={boundedLogoScale(document.logoScale || defaultLogoScale)} onChange={(event) => updateLogoTransform({ position: document.logoPosition || defaultLogoPosition, scale: Number(event.target.value) })} /><output>{Math.round(boundedLogoScale(document.logoScale || defaultLogoScale) * 100)}%</output></label><label>แนวนอน <input type="range" min="-24" max="24" step="1" value={boundedLogoPosition(document.logoPosition || defaultLogoPosition).x} onChange={(event) => updateLogoTransform({ position: { ...boundedLogoPosition(document.logoPosition || defaultLogoPosition), x: Number(event.target.value) }, scale: document.logoScale || defaultLogoScale })} /><output>{boundedLogoPosition(document.logoPosition || defaultLogoPosition).x}</output></label><label>แนวตั้ง <input type="range" min="-18" max="18" step="1" value={boundedLogoPosition(document.logoPosition || defaultLogoPosition).y} onChange={(event) => updateLogoTransform({ position: { ...boundedLogoPosition(document.logoPosition || defaultLogoPosition), y: Number(event.target.value) }, scale: document.logoScale || defaultLogoScale })} /><output>{boundedLogoPosition(document.logoPosition || defaultLogoPosition).y}</output></label><div className="logo-align-actions"><button type="button" onClick={() => updateLogoTransform({ position: { x: -16, y: 0 }, scale: document.logoScale || defaultLogoScale })}>ชิดซ้าย</button><button type="button" onClick={() => updateLogoTransform({ position: defaultLogoPosition, scale: document.logoScale || defaultLogoScale })}>กึ่งกลาง</button><button type="button" onClick={() => updateLogoTransform({ position: { x: 16, y: 0 }, scale: document.logoScale || defaultLogoScale })}>ชิดขวา</button></div><button type="button" className="reset-logo-transform" onClick={resetLogoTransform}>รีเซ็ตขนาดและตำแหน่ง</button></div>}
+	                  <DocumentAssetTile label="ตรายาง" previewUrl={document.stampUrl || ""} previewHighlight="signature" onChange={(event) => handleDocumentAsset(event, "stampUrl", "ตรายาง")} onRemove={() => removeDocumentAsset("stampUrl", "ตรายาง")} />
+	                </div>
+	                <section className="logo-presets" data-preview-highlight="company" aria-label="โลโก้ที่ใช้บ่อย">
+	                  <div className="logo-presets-heading"><div><strong>โลโก้ที่ใช้บ่อย</strong><span>บันทึกได้สูงสุด {MAX_LOGO_PRESETS} แบรนด์ในอุปกรณ์นี้</span></div></div>
+	                  {document.company.logoUrl && <div className="save-logo-preset"><input value={logoPresetName} onChange={(event) => setLogoPresetName(event.target.value)} maxLength={40} placeholder="ชื่อแบรนด์ เช่น ร้าน A" aria-label="ชื่อ preset โลโก้" /><button type="button" disabled={!logoPresetName.trim()} onClick={saveLogoPreset}><Save size={14} /> บันทึก preset</button></div>}
+	                  {logoPresets.length ? <div className="logo-preset-list">{logoPresets.map((preset) => <div className="logo-preset-card" key={preset.id}><button type="button" className="logo-preset-select" onClick={() => applyLogoPreset(preset)}><span><img src={preset.logoUrl} alt="" /></span><strong>{preset.name}</strong></button><button type="button" className="logo-preset-remove" onClick={() => removeLogoPreset(preset.id)} aria-label={`ลบ preset ${preset.name}`} title={`ลบ ${preset.name}`}><Trash2 size={14} /></button></div>)}</div> : <p className="logo-preset-empty">ยังไม่มี preset — อัปโหลดหรือเลือกโลโก้ แล้วตั้งชื่อเพื่อบันทึกไว้ใช้ครั้งถัดไป</p>}
+	                </section>
+	                {lastRemovedLogo && <button type="button" className="undo-logo-button" data-preview-highlight="company" onClick={undoRemoveLogo}><Undo2 size={15} /> เลิกทำการลบโลโก้</button>}
+	                {document.company.logoUrl && <div className="logo-transform-controls" data-preview-highlight="company"><div><strong>ขนาดและตำแหน่งโลโก้</strong><span>ปรับผลที่แสดงในหัวเอกสารและ PDF ได้ทันที</span></div><label>ขนาด <input type="range" min="0.65" max="1.45" step="0.05" value={boundedLogoScale(document.logoScale || defaultLogoScale)} onChange={(event) => updateLogoTransform({ position: document.logoPosition || defaultLogoPosition, scale: Number(event.target.value) })} /><output>{Math.round(boundedLogoScale(document.logoScale || defaultLogoScale) * 100)}%</output></label><label>แนวนอน <input type="range" min="-24" max="24" step="1" value={boundedLogoPosition(document.logoPosition || defaultLogoPosition).x} onChange={(event) => updateLogoTransform({ position: { ...boundedLogoPosition(document.logoPosition || defaultLogoPosition), x: Number(event.target.value) }, scale: document.logoScale || defaultLogoScale })} /><output>{boundedLogoPosition(document.logoPosition || defaultLogoPosition).x}</output></label><label>แนวตั้ง <input type="range" min="-18" max="18" step="1" value={boundedLogoPosition(document.logoPosition || defaultLogoPosition).y} onChange={(event) => updateLogoTransform({ position: { ...boundedLogoPosition(document.logoPosition || defaultLogoPosition), y: Number(event.target.value) }, scale: document.logoScale || defaultLogoScale })} /><output>{boundedLogoPosition(document.logoPosition || defaultLogoPosition).y}</output></label><div className="logo-align-actions"><button type="button" onClick={() => updateLogoTransform({ position: { x: -16, y: 0 }, scale: document.logoScale || defaultLogoScale })}>ชิดซ้าย</button><button type="button" onClick={() => updateLogoTransform({ position: defaultLogoPosition, scale: document.logoScale || defaultLogoScale })}>กึ่งกลาง</button><button type="button" onClick={() => updateLogoTransform({ position: { x: 16, y: 0 }, scale: document.logoScale || defaultLogoScale })}>ชิดขวา</button></div><button type="button" className="reset-logo-transform" onClick={resetLogoTransform}>รีเซ็ตขนาดและตำแหน่ง</button></div>}
                 {document.stampUrl && <div className="stamp-transform-controls" data-preview-highlight="signature"><div><strong>จัดวางตรายาง</strong><span>ลากตรายางบนตัวอย่างเอกสารเพื่อย้ายตำแหน่ง หรือลากจุดมุมเพื่อปรับขนาด</span></div><label>ขนาด <input type="range" min="0.6" max="1.7" step="0.05" value={boundedStampScale(document.stampScale || defaultStampScale)} onChange={(event) => updateStampTransform({ position: document.stampPosition || defaultStampPosition, scale: Number(event.target.value) })} /><output>{Math.round(boundedStampScale(document.stampScale || defaultStampScale) * 100)}%</output></label><button type="button" onClick={resetStampTransform}>จัดวางใหม่</button></div>}
               {profileQuery.data && <button type="button" className="apply-template-button" data-preview-highlight="company" onClick={applySavedCompany}>ใช้ template บริษัทที่บันทึก</button>}
               <p className="design-hint">แนะนำ: ใช้ไฟล์ PNG พื้นหลังโปร่งใสสำหรับลายเซ็นและตรายาง ขนาดไม่เกิน 500 KB เพื่อให้ดูคมชัดใน PDF</p>

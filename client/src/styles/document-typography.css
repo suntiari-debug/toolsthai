@@ -375,11 +375,33 @@
 .logo-editor-controls input { accent-color: #0d7a75; }
 .logo-editor-controls output { color: #0d6e72; font-family: "DM Sans", sans-serif; font-size: .72rem; font-weight: 700; text-align: right; }
 
+.undo-logo-button { display: inline-flex; align-items: center; gap: .38rem; margin-top: .7rem; padding: .46rem .62rem; border: 1px solid #a8cec1; border-radius: .52rem; color: #075e62; background: #edf8f3; font: inherit; font-size: .72rem; font-weight: 700; }
+.undo-logo-button:hover { background: #dff2ea; }
+.logo-presets { display: grid; gap: .55rem; margin-top: .8rem; padding: .68rem; border: 1px solid #dbe7e2; border-radius: .65rem; background: #fbfdfc; }
+.logo-presets-heading > div { display: grid; gap: .08rem; }
+.logo-presets-heading strong { color: #304045; font-size: .74rem; }
+.logo-presets-heading span { color: #6a7b77; font-size: .62rem; line-height: 1.4; }
+.save-logo-preset { display: flex; gap: .4rem; }
+.save-logo-preset input { min-width: 0; flex: 1; min-height: 2rem; padding: .35rem .5rem; border: 1px solid #cdded8; border-radius: .42rem; color: #304045; background: #fff; font: inherit; font-size: .7rem; }
+.save-logo-preset button { display: inline-flex; align-items: center; gap: .28rem; padding: .35rem .5rem; border: 1px solid #0d7a75; border-radius: .42rem; color: #fff; background: #0d7a75; font: inherit; font-size: .67rem; font-weight: 700; white-space: nowrap; }
+.save-logo-preset button:disabled { cursor: not-allowed; opacity: .5; }
+.logo-preset-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .42rem; }
+.logo-preset-card { display: flex; min-width: 0; overflow: hidden; border: 1px solid #d8e7e0; border-radius: .45rem; background: #fff; }
+.logo-preset-select { display: flex; min-width: 0; flex: 1; align-items: center; gap: .38rem; padding: .35rem; color: #40524e; background: transparent; font: inherit; text-align: left; }
+.logo-preset-select:hover { background: #f0f8f4; }
+.logo-preset-select > span { display: grid; width: 1.75rem; height: 1.75rem; flex: 0 0 auto; place-items: center; overflow: hidden; border-radius: .3rem; background: #f4f7f5; }
+.logo-preset-select img { width: 100%; height: 100%; object-fit: contain; }
+.logo-preset-select strong { overflow: hidden; color: #33433f; font-size: .66rem; text-overflow: ellipsis; white-space: nowrap; }
+.logo-preset-remove { display: grid; width: 1.8rem; flex: 0 0 auto; place-items: center; border-left: 1px solid #e4ece8; color: #a34a40; background: #fff; }
+.logo-preset-remove:hover { color: #812e25; background: #fff0ed; }
+.logo-preset-empty { margin: 0; color: #71817d; font-size: .65rem; line-height: 1.45; }
+
 @media (max-width: 540px) {
   .stamp-transform-controls,
   .logo-transform-controls { grid-template-columns: 1fr; }
   .logo-editor-controls label { grid-template-columns: 1fr; gap: .25rem; }
   .logo-editor-controls output { text-align: left; }
+  .logo-preset-list { grid-template-columns: 1fr; }
 }
 
 @media print {
