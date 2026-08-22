@@ -322,6 +322,41 @@
   .document-tool-page .pdf-stamp-wrapper :is(.stamp-drag-handle, .stamp-resize-handle) { display: none !important; }
 }
 
+/* Focus-linked regions are screen-only so exported and printed A4 files remain unchanged. */
+@media screen {
+  .document-tool-page .document-preview [data-preview-region].is-preview-highlighted,
+  .document-tool-page .document-preview[data-preview-region="document"].is-preview-highlighted {
+    outline: .18rem solid color-mix(in srgb, var(--document-accent) 76%, #ffffff);
+    outline-offset: .28rem;
+    box-shadow: 0 0 0 .42rem color-mix(in srgb, var(--document-accent) 14%, transparent);
+  }
+
+  .document-tool-page .pdf-header.is-preview-highlighted,
+  .document-tool-page .pdf-document-meta.is-preview-highlighted,
+  .document-tool-page .pdf-note.is-preview-highlighted,
+  .document-tool-page .pdf-totals.is-preview-highlighted,
+  .document-tool-page .pdf-signatures.is-preview-highlighted {
+    border-radius: .42rem;
+  }
+
+  .document-tool-page .pdf-customer-section.is-preview-highlighted {
+    border-radius: .42rem;
+  }
+
+  .document-tool-page .pdf-items-table tr.is-preview-highlighted > td {
+    background: color-mix(in srgb, var(--document-accent) 12%, #ffffff);
+    box-shadow: inset 0 .14rem 0 color-mix(in srgb, var(--document-accent) 76%, #ffffff), inset 0 -.14rem 0 color-mix(in srgb, var(--document-accent) 76%, #ffffff);
+  }
+
+  .document-tool-page .pdf-items-table tr.is-preview-highlighted > td:first-child {
+    box-shadow: inset .14rem 0 0 color-mix(in srgb, var(--document-accent) 76%, #ffffff), inset 0 .14rem 0 color-mix(in srgb, var(--document-accent) 76%, #ffffff), inset 0 -.14rem 0 color-mix(in srgb, var(--document-accent) 76%, #ffffff);
+  }
+
+  .document-tool-page .pdf-items-table tr.is-preview-highlighted > td:last-child {
+    box-shadow: inset -.14rem 0 0 color-mix(in srgb, var(--document-accent) 76%, #ffffff), inset 0 .14rem 0 color-mix(in srgb, var(--document-accent) 76%, #ffffff), inset 0 -.14rem 0 color-mix(in srgb, var(--document-accent) 76%, #ffffff);
+  }
+}
+
 @media (max-width: 540px) {
   .document-tool-page .workspace-action,
   .document-tool-page .autosave-status,
