@@ -160,7 +160,20 @@ try {
   if (await desktopPage.locator(".preview-zoom-controls output").textContent() !== "90%") throw new Error("Desktop quotation preview zoom was not restored");
   await page.goto("http://127.0.0.1:3000/quotation", { waitUntil: "networkidle" });
   if (await page.locator(".preview-zoom-controls output").textContent() !== "110%") throw new Error("Mobile quotation did not retain its own preview zoom after desktop update");
-  await page.locator('button[aria-label="ล้างค่าซูมที่จำไว้สำหรับอุปกรณ์นี้"]').evaluate((button) => button.click());
+  const resetTrigger = page.locator('button[aria-label="ล้างค่าซูมที่จำไว้สำหรับอุปกรณ์นี้"]');
+  await resetTrigger.evaluate((button) => button.click());
+  const confirmDialog = page.locator('[data-slot="alert-dialog-content"]');
+  await confirmDialog.waitFor();
+  if (!(await confirmDialog.textContent())?.includes("ล้างค่าซูมที่จำไว้?")) throw new Error("Zoom reset confirmation dialog did not describe the action");
+  await confirmDialog.getByRole("button", { name: "ยกเลิก" }).click();
+  await page.waitForTimeout(80);
+  if (await page.locator(".preview-zoom-controls output").textContent() !== "110%") throw new Error("Cancelling zoom reset incorrectly changed the preview zoom");
+  if (await page.evaluate(() => window.localStorage.getItem("toolsthai.preview-zoom.quotation.mobile")) !== "1") {
+    throw new Error("Cancelling zoom reset incorrectly removed the stored preference");
+  }
+  await resetTrigger.evaluate((button) => button.click());
+  await confirmDialog.waitFor();
+  await confirmDialog.getByRole("button", { name: "ล้างค่าซูม", exact: true }).click();
   await page.waitForTimeout(80);
   if (await page.locator(".preview-zoom-controls output").textContent() !== "100%") throw new Error("Current device reset did not return the preview to 100%");
   if (await page.evaluate(() => window.localStorage.getItem("toolsthai.preview-zoom.quotation.mobile")) !== null) {
