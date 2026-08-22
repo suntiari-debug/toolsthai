@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountToThaiWords, boundedStampPosition, boundedStampScale, calculateDocumentTotals, convertDocument, createInitialDocument, restoreDocument } from "./document";
+import { amountToThaiWords, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampScale, calculateDocumentTotals, convertDocument, createInitialDocument, restoreDocument } from "./document";
 
 describe("document calculations", () => {
   it("calculates an excluded VAT document with discount", () => {
@@ -40,6 +40,13 @@ describe("document calculations", () => {
     expect(boundedStampPosition({ x: 52.34, y: 46.66 })).toEqual({ x: 52.3, y: 46.7 });
     expect(boundedStampScale(.1)).toBe(.6);
     expect(boundedStampScale(2.5)).toBe(1.7);
+  });
+
+  it("limits logo crop, scale, and position to the printable header range", () => {
+    expect(boundedLogoPosition({ x: -90, y: 80 })).toEqual({ x: -24, y: 18 });
+    expect(boundedLogoScale(.1)).toBe(.65);
+    expect(boundedLogoScale(9)).toBe(1.45);
+    expect(boundedLogoCrop({ zoom: 7, x: -80, y: 80, brightness: 1, contrast: 500 })).toEqual({ zoom: 2.4, x: -34, y: 34, brightness: 70, contrast: 130 });
   });
 
   it("converts a quotation to every downstream document while preserving company, customer, and items", () => {

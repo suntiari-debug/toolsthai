@@ -1,5 +1,5 @@
 import { type CSSProperties, useRef } from "react";
-import { BusinessDocument, StampPosition, boundedStampPosition, boundedStampScale, calculateDocumentTotals, defaultStampPosition, defaultStampScale, documentMeta, formatNumber, formatTHB, formatThaiDate, amountToThaiWords } from "@/lib/document";
+import { BusinessDocument, StampPosition, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampScale, calculateDocumentTotals, defaultLogoPosition, defaultLogoScale, defaultStampPosition, defaultStampScale, documentMeta, formatNumber, formatTHB, formatThaiDate, amountToThaiWords } from "@/lib/document";
 import type { PreviewHighlightTarget } from "@/lib/previewHighlight";
 import type { PreviewPan } from "@/lib/previewZoom";
 
@@ -22,6 +22,9 @@ export default function DocumentPreview({ document, accentColor = "#0d7a75", tem
   const stampPointer = useRef<{ action: "move" | "resize"; clientX: number; clientY: number; position: StampPosition; scale: number } | null>(null);
   const stampPosition = boundedStampPosition(document.stampPosition || defaultStampPosition);
   const stampScale = boundedStampScale(document.stampScale || defaultStampScale);
+  const logoPosition = boundedLogoPosition(document.logoPosition || defaultLogoPosition);
+  const logoScale = boundedLogoScale(document.logoScale || defaultLogoScale);
+  const logoCrop = boundedLogoCrop(document.logoCrop);
   const highlightClass = (target: PreviewHighlightTarget) => activeHighlight === target ? " is-preview-highlighted" : "";
   const startStampPointer = (event: React.PointerEvent<HTMLButtonElement>, action: "move" | "resize") => {
     if (!isStampEditable || !document.stampUrl || !onStampTransformChange) return;
@@ -55,7 +58,7 @@ export default function DocumentPreview({ document, accentColor = "#0d7a75", tem
       {document.watermark && <div className="document-watermark">TOOLS THAI</div>}
       <header className={`pdf-header${highlightClass("company")}`} data-preview-region="company">
         <div className="pdf-company">
-          {document.company.logoUrl ? <img className="pdf-logo" src={document.company.logoUrl} alt="โลโก้บริษัท" /> : null}
+          {document.company.logoUrl ? <div className="pdf-logo-frame" style={{ "--logo-offset-x": `${logoPosition.x}px`, "--logo-offset-y": `${logoPosition.y}px`, "--logo-scale": String(logoScale), "--logo-crop-x": `${logoCrop.x}%`, "--logo-crop-y": `${logoCrop.y}%`, "--logo-crop-zoom": String(logoCrop.zoom), "--logo-brightness": `${logoCrop.brightness}%`, "--logo-contrast": `${logoCrop.contrast}%` } as CSSProperties}><img className="pdf-logo" src={document.company.logoUrl} alt="โลโก้บริษัท" /></div> : null}
           <div>
             <p className="pdf-company-name">{document.company.name || "ชื่อบริษัทของคุณ"}</p>
             <p>{document.company.address || "ที่อยู่บริษัท"}</p>

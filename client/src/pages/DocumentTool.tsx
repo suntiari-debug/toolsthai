@@ -1,18 +1,20 @@
-import { ChangeEvent, TouchEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, type CSSProperties, TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, ArrowRight, Download, Eye, FileDown, FilePlus2, Info, Plus, Printer, RotateCcw, Save, ShieldCheck, Trash2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Eye, EyeOff, FileDown, FilePlus2, Info, Plus, Printer, RotateCcw, Save, ShieldCheck, Trash2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
 import PublicFooter from "@/components/PublicFooter";
 import PublicHeader from "@/components/PublicHeader";
 import DocumentPreview from "@/components/DocumentPreview";
 import DocumentSeoContent from "@/components/DocumentSeoContent";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { BusinessDocument, DocumentKind, LineItem, boundedStampPosition, boundedStampScale, calculateDocumentTotals, convertDocument, createInitialDocument, defaultStampPosition, defaultStampScale, documentMeta, formatTHB, makeDocumentNumber, restoreDocument } from "@/lib/document";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { BusinessDocument, DocumentKind, LineItem, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampScale, calculateDocumentTotals, convertDocument, createInitialDocument, defaultLogoCrop, defaultLogoPosition, defaultLogoScale, defaultStampPosition, defaultStampScale, documentMeta, formatTHB, makeDocumentNumber, restoreDocument } from "@/lib/document";
 import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import SeoMeta from "@/components/SeoMeta";
 import { getDocumentSeo, getDocumentStructuredData } from "@shared/seo";
 import { isTemporaryDocumentAssetUrl, validateDocumentAssetFile } from "@/lib/documentAssets";
+import { getDocumentValidationIssues } from "@/lib/documentValidation";
 import { getItemPreviewHighlightTarget, getPreviewHighlightTarget, type PreviewHighlightTarget } from "@/lib/previewHighlight";
 import "../styles/document-typography.css";
 import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollBehavior, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
@@ -50,6 +52,10 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const [isPreviewResetAnimating, setIsPreviewResetAnimating] = useState(false);
   const [previewZoomDevice, setPreviewZoomDevice] = useState<PreviewZoomDevice>(() => typeof window === "undefined" ? "desktop" : getPreviewZoomDevice(window.innerWidth));
   const [activePreviewHighlight, setActivePreviewHighlight] = useState<PreviewHighlightTarget | null>(null);
+  const [isPreviewHighlightEnabled, setIsPreviewHighlightEnabled] = useState(true);
+  const [isPdfValidationOpen, setIsPdfValidationOpen] = useState(false);
+  const [isLogoRemoveOpen, setIsLogoRemoveOpen] = useState(false);
+  const [isLogoEditorOpen, setIsLogoEditorOpen] = useState(false);
   const pinchState = useRef<{ distance: number; zoom: PreviewZoom } | null>(null);
   const panState = useRef<{ clientX: number; clientY: number; pan: PreviewPan } | null>(null);
   const singleTouchState = useRef<{ x: number; y: number; moved: boolean } | null>(null);
@@ -69,6 +75,8 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const meta = documentMeta[kind];
   const seo = getDocumentSeo(kind);
   const totals = useMemo(() => calculateDocumentTotals(document), [document]);
+  const pdfValidationIssues = useMemo(() => getDocumentValidationIssues(document), [document]);
+  const logoCrop = boundedLogoCrop(document.logoCrop);
   const previewZoomLabel = previewZoom === -1 ? "90%" : previewZoom === 1 ? "110%" : "100%";
   const previewHint = previewZoom === 1 ? "ลากหนึ่งนิ้วเพื่อเลื่อน · แตะสองครั้งเพื่อรีเซ็ต" : "ถ่างหรือหุบนิ้วสองนิ้วเพื่อซูม · แตะสองครั้งเพื่อรีเซ็ต";
   const previewScrollIndicator = previewZoom === 1 ? getPreviewScrollIndicator(previewPan.y, 188) : null;
@@ -217,14 +225,18 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     const file = event.target.files?.[0];
     if (!file || !file.type.startsWith("image/")) return;
     if (isTemporaryDocumentAssetUrl(document.company.logoUrl)) URL.revokeObjectURL(document.company.logoUrl);
-    updateParty("company", "logoUrl", URL.createObjectURL(file));
+    const logoUrl = URL.createObjectURL(file);
+    setDocument((current) => ({ ...current, company: { ...current.company, logoUrl }, logoPosition: { ...defaultLogoPosition }, logoScale: defaultLogoScale, logoCrop: { ...defaultLogoCrop } }));
+    setIsLogoEditorOpen(true);
     event.target.value = "";
   };
   const removeLogo = () => {
     if (isTemporaryDocumentAssetUrl(document.company.logoUrl)) URL.revokeObjectURL(document.company.logoUrl);
-    updateParty("company", "logoUrl", "");
+    setDocument((current) => ({ ...current, company: { ...current.company, logoUrl: "" }, logoPosition: { ...defaultLogoPosition }, logoScale: defaultLogoScale, logoCrop: { ...defaultLogoCrop } }));
+    setIsLogoRemoveOpen(false);
     flashNotice("ลบโลโก้ออกจากเอกสารนี้แล้ว");
   };
+  const updateLogoCrop = (update: Partial<BusinessDocument["logoCrop"]>) => setDocument((current) => ({ ...current, logoCrop: boundedLogoCrop({ ...current.logoCrop, ...update }) }));
   const handleDocumentAsset = (event: ChangeEvent<HTMLInputElement>, field: "signatureUrl" | "stampUrl", label: string) => {
     const file = event.target.files?.[0];
     const validation = validateDocumentAssetFile(file, label);
@@ -241,6 +253,8 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   };
   const updateStampTransform = (transform: { position: { x: number; y: number }; scale: number }) => setDocument((current) => ({ ...current, stampPosition: boundedStampPosition(transform.position), stampScale: boundedStampScale(transform.scale) }));
   const resetStampTransform = () => updateStampTransform({ position: defaultStampPosition, scale: defaultStampScale });
+  const updateLogoTransform = (transform: { position: { x: number; y: number }; scale: number }) => setDocument((current) => ({ ...current, logoPosition: boundedLogoPosition(transform.position), logoScale: boundedLogoScale(transform.scale) }));
+  const resetLogoTransform = () => updateLogoTransform({ position: defaultLogoPosition, scale: defaultLogoScale });
   const updatePreviewHighlightFromTarget = (target: EventTarget | null) => {
     if (!(target instanceof Element)) return;
     const highlight = getPreviewHighlightTarget(target.closest<HTMLElement>("[data-preview-highlight]")?.dataset.previewHighlight);
@@ -252,7 +266,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActivePreviewHighlight(null);
   };
 
-  const handlePdfExport = async () => {
+  const exportPdf = async () => {
     const printable = window.document.getElementById("printable-document");
     if (!printable || isExporting) return;
     setIsExporting(true);
@@ -282,6 +296,14 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const requestPdfExport = () => {
+    if (pdfValidationIssues.length > 0) {
+      setIsPdfValidationOpen(true);
+      return;
+    }
+    void exportPdf();
   };
 
   const handleConvert = (target: DocumentKind) => {
@@ -316,7 +338,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
         <div className="shell document-topbar reference-topbar print-hide">
           <div className="workspace-context"><Link href="/tools" className="back-link"><ArrowLeft size={16} /> เครื่องมือทั้งหมด</Link><h1 className="sr-only">{seo?.h1 || meta.title}</h1></div>
           <div className="document-top-actions reference-actions">
-            <button type="button" className="button button-download" onClick={handlePdfExport} disabled={isExporting}><FileDown size={17} /> {isExporting ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
+            <button type="button" className="button button-download" onClick={requestPdfExport} disabled={isExporting}><FileDown size={17} /> {isExporting ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
             <button type="button" className="workspace-action" onClick={() => window.print()}><Printer size={16} /> พิมพ์</button>
             <button type="button" className="workspace-action text-action" onClick={handleReset}><RotateCcw size={16} /> รีเซ็ต</button>
             <button type="button" className="workspace-action save-action" onClick={handleAccountSave} disabled={saveDocument.isPending}><Save size={16} /> {isAuthenticated ? (saveDocument.isPending ? "กำลังบันทึก" : "บันทึก") : "บันทึก"}</button>
@@ -324,6 +346,8 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
           <span className="autosave-status"><span>✓</span> บันทึกอัตโนมัติในอุปกรณ์</span>
         </div>
         {notice && <div className="draft-toast print-hide"><ShieldCheck size={17} /> {notice}</div>}
+        <AlertDialog open={isPdfValidationOpen} onOpenChange={setIsPdfValidationOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ตรวจข้อมูลสำคัญก่อนดาวน์โหลด PDF</AlertDialogTitle><AlertDialogDescription>พบข้อมูลที่ควรตรวจทานก่อนสร้าง PDF คุณสามารถกลับไปแก้ไข หรือดาวน์โหลดต่อได้หากยืนยันว่าข้อมูลถูกต้องแล้ว</AlertDialogDescription></AlertDialogHeader><ul className="pdf-validation-list">{pdfValidationIssues.map((issue) => <li key={issue.id}><strong>{issue.label}</strong><span>{issue.message}</span></li>)}</ul><AlertDialogFooter><AlertDialogCancel>กลับไปแก้ไข</AlertDialogCancel><AlertDialogAction onClick={() => { setIsPdfValidationOpen(false); void exportPdf(); }}>ดาวน์โหลดต่อ</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+        <Dialog open={isLogoEditorOpen} onOpenChange={setIsLogoEditorOpen}><DialogContent className="logo-editor-dialog"><DialogHeader><DialogTitle>ครอปและปรับแต่งโลโก้</DialogTitle><DialogDescription>ปรับมุมมองโลโก้ก่อนใช้ในหัวเอกสาร การเปลี่ยนแปลงจะแสดงใน preview และ PDF ทันที</DialogDescription></DialogHeader>{document.company.logoUrl && <><div className="logo-crop-preview"><img src={document.company.logoUrl} alt="ตัวอย่างการครอปโลโก้" style={{ "--logo-crop-x": `${logoCrop.x}%`, "--logo-crop-y": `${logoCrop.y}%`, "--logo-crop-zoom": String(logoCrop.zoom), "--logo-brightness": `${logoCrop.brightness}%`, "--logo-contrast": `${logoCrop.contrast}%` } as CSSProperties} /></div><div className="logo-editor-controls"><label>ซูม <input type="range" min="1" max="2.4" step="0.05" value={logoCrop.zoom} onChange={(event) => updateLogoCrop({ zoom: Number(event.target.value) })} /><output>{Math.round(logoCrop.zoom * 100)}%</output></label><label>เลื่อนซ้าย–ขวา <input type="range" min="-34" max="34" step="1" value={logoCrop.x} onChange={(event) => updateLogoCrop({ x: Number(event.target.value) })} /><output>{logoCrop.x}</output></label><label>เลื่อนขึ้น–ลง <input type="range" min="-34" max="34" step="1" value={logoCrop.y} onChange={(event) => updateLogoCrop({ y: Number(event.target.value) })} /><output>{logoCrop.y}</output></label><label>ความสว่าง <input type="range" min="70" max="130" step="1" value={logoCrop.brightness} onChange={(event) => updateLogoCrop({ brightness: Number(event.target.value) })} /><output>{logoCrop.brightness}%</output></label><label>ความคมชัด <input type="range" min="70" max="130" step="1" value={logoCrop.contrast} onChange={(event) => updateLogoCrop({ contrast: Number(event.target.value) })} /><output>{logoCrop.contrast}%</output></label></div></>}<DialogFooter><button type="button" className="workspace-action" onClick={() => updateDocument("logoCrop", { ...defaultLogoCrop })}>รีเซ็ตการปรับแต่ง</button><button type="button" className="button button-download" onClick={() => setIsLogoEditorOpen(false)}>ใช้กับเอกสาร</button></DialogFooter></DialogContent></Dialog>
         <div className="shell document-grid reference-document-grid">
           <section className="document-form-card reference-form-panel print-hide" onFocusCapture={handleFormFocus} onBlurCapture={handleFormBlur} onClickCapture={handleFormClick}>
             <section className="form-section document-design-section">
@@ -334,12 +358,13 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
               </div>
               <p className="design-label">สีหลัก</p>
               <div className="accent-picker" aria-label="เลือกสีหลักของเอกสาร">{accentChoices.map((color) => <button type="button" key={color} className={accentColor === color ? "is-selected" : ""} data-preview-highlight="document" onClick={() => setAccentColor(color)} style={{ backgroundColor: color }} aria-label={`เลือกสี ${color}`} />)}</div>
-              <div className="document-assets-row">
-                <div className="asset-upload-tile" data-preview-highlight="company"><span className="asset-preview">{document.company.logoUrl ? <img src={document.company.logoUrl} alt="ตัวอย่างโลโก้" /> : <WandSparkles size={18} />}</span><strong>โลโก้</strong><label className="asset-upload-action"><Upload size={13} /> {document.company.logoUrl ? "เปลี่ยนรูป" : "อัปโหลด"}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogo} /></label>{document.company.logoUrl && <button type="button" className="asset-remove-button" onClick={removeLogo}>ลบรูป</button>}</div>
-                <DocumentAssetTile label="ลายเซ็น" previewUrl={document.signatureUrl || ""} previewHighlight="signature" onChange={(event) => handleDocumentAsset(event, "signatureUrl", "ลายเซ็น")} onRemove={() => removeDocumentAsset("signatureUrl", "ลายเซ็น")} />
-                <DocumentAssetTile label="ตรายาง" previewUrl={document.stampUrl || ""} previewHighlight="signature" onChange={(event) => handleDocumentAsset(event, "stampUrl", "ตรายาง")} onRemove={() => removeDocumentAsset("stampUrl", "ตรายาง")} />
-              </div>
-              {document.stampUrl && <div className="stamp-transform-controls" data-preview-highlight="signature"><div><strong>จัดวางตรายาง</strong><span>ลากตรายางบนตัวอย่างเอกสารเพื่อย้ายตำแหน่ง หรือลากจุดมุมเพื่อปรับขนาด</span></div><label>ขนาด <input type="range" min="0.6" max="1.7" step="0.05" value={boundedStampScale(document.stampScale || defaultStampScale)} onChange={(event) => updateStampTransform({ position: document.stampPosition || defaultStampPosition, scale: Number(event.target.value) })} /><output>{Math.round(boundedStampScale(document.stampScale || defaultStampScale) * 100)}%</output></label><button type="button" onClick={resetStampTransform}>จัดวางใหม่</button></div>}
+                <div className="document-assets-row">
+                  <div className="asset-upload-tile" data-preview-highlight="company"><span className="asset-preview">{document.company.logoUrl ? <img src={document.company.logoUrl} alt="ตัวอย่างโลโก้" /> : <WandSparkles size={18} />}</span><strong>โลโก้</strong><label className="asset-upload-action"><Upload size={13} /> {document.company.logoUrl ? "เปลี่ยนรูป" : "อัปโหลด"}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogo} /></label>{document.company.logoUrl && <><button type="button" className="asset-edit-button" onClick={() => setIsLogoEditorOpen(true)}>ปรับแต่ง</button><AlertDialog open={isLogoRemoveOpen} onOpenChange={setIsLogoRemoveOpen}><AlertDialogTrigger asChild><button type="button" className="asset-remove-button">ลบรูป</button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ลบโลโก้ออกจากเอกสารนี้?</AlertDialogTitle><AlertDialogDescription>โลโก้จะหายจากตัวอย่างเอกสารและ PDF ปัจจุบัน แต่จะไม่ลบไฟล์ต้นฉบับที่เก็บอยู่ใน template บริษัท</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>ยกเลิก</AlertDialogCancel><AlertDialogAction onClick={removeLogo}>ลบโลโก้</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>}</div>
+                  <DocumentAssetTile label="ลายเซ็น" previewUrl={document.signatureUrl || ""} previewHighlight="signature" onChange={(event) => handleDocumentAsset(event, "signatureUrl", "ลายเซ็น")} onRemove={() => removeDocumentAsset("signatureUrl", "ลายเซ็น")} />
+                  <DocumentAssetTile label="ตรายาง" previewUrl={document.stampUrl || ""} previewHighlight="signature" onChange={(event) => handleDocumentAsset(event, "stampUrl", "ตรายาง")} onRemove={() => removeDocumentAsset("stampUrl", "ตรายาง")} />
+                </div>
+                {document.company.logoUrl && <div className="logo-transform-controls" data-preview-highlight="company"><div><strong>ขนาดและตำแหน่งโลโก้</strong><span>ปรับผลที่แสดงในหัวเอกสารและ PDF ได้ทันที</span></div><label>ขนาด <input type="range" min="0.65" max="1.45" step="0.05" value={boundedLogoScale(document.logoScale || defaultLogoScale)} onChange={(event) => updateLogoTransform({ position: document.logoPosition || defaultLogoPosition, scale: Number(event.target.value) })} /><output>{Math.round(boundedLogoScale(document.logoScale || defaultLogoScale) * 100)}%</output></label><label>แนวนอน <input type="range" min="-24" max="24" step="1" value={boundedLogoPosition(document.logoPosition || defaultLogoPosition).x} onChange={(event) => updateLogoTransform({ position: { ...boundedLogoPosition(document.logoPosition || defaultLogoPosition), x: Number(event.target.value) }, scale: document.logoScale || defaultLogoScale })} /><output>{boundedLogoPosition(document.logoPosition || defaultLogoPosition).x}</output></label><label>แนวตั้ง <input type="range" min="-18" max="18" step="1" value={boundedLogoPosition(document.logoPosition || defaultLogoPosition).y} onChange={(event) => updateLogoTransform({ position: { ...boundedLogoPosition(document.logoPosition || defaultLogoPosition), y: Number(event.target.value) }, scale: document.logoScale || defaultLogoScale })} /><output>{boundedLogoPosition(document.logoPosition || defaultLogoPosition).y}</output></label><div className="logo-align-actions"><button type="button" onClick={() => updateLogoTransform({ position: { x: -16, y: 0 }, scale: document.logoScale || defaultLogoScale })}>ชิดซ้าย</button><button type="button" onClick={() => updateLogoTransform({ position: defaultLogoPosition, scale: document.logoScale || defaultLogoScale })}>กึ่งกลาง</button><button type="button" onClick={() => updateLogoTransform({ position: { x: 16, y: 0 }, scale: document.logoScale || defaultLogoScale })}>ชิดขวา</button></div><button type="button" className="reset-logo-transform" onClick={resetLogoTransform}>รีเซ็ตขนาดและตำแหน่ง</button></div>}
+                {document.stampUrl && <div className="stamp-transform-controls" data-preview-highlight="signature"><div><strong>จัดวางตรายาง</strong><span>ลากตรายางบนตัวอย่างเอกสารเพื่อย้ายตำแหน่ง หรือลากจุดมุมเพื่อปรับขนาด</span></div><label>ขนาด <input type="range" min="0.6" max="1.7" step="0.05" value={boundedStampScale(document.stampScale || defaultStampScale)} onChange={(event) => updateStampTransform({ position: document.stampPosition || defaultStampPosition, scale: Number(event.target.value) })} /><output>{Math.round(boundedStampScale(document.stampScale || defaultStampScale) * 100)}%</output></label><button type="button" onClick={resetStampTransform}>จัดวางใหม่</button></div>}
               {profileQuery.data && <button type="button" className="apply-template-button" data-preview-highlight="company" onClick={applySavedCompany}>ใช้ template บริษัทที่บันทึก</button>}
               <p className="design-hint">แนะนำ: ใช้ไฟล์ PNG พื้นหลังโปร่งใสสำหรับลายเซ็นและตรายาง ขนาดไม่เกิน 500 KB เพื่อให้ดูคมชัดใน PDF</p>
               <button type="button" className="design-preview-link" onClick={scrollToPreview}><Eye size={15} /> ดูตัวอย่างที่อัปเดต</button>
@@ -384,12 +409,12 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
               <button type="button" className="draft-link" onClick={handleDraft}>บันทึกฉบับร่างไว้ในอุปกรณ์นี้</button>
             </section>
             <div className="form-summary"><span>ยอดรวมสุทธิ</span><strong>{formatTHB(totals.total)}</strong><small>{document.vatMode !== "none" ? `รวม VAT ${document.vatRate}% แล้ว` : "ไม่คิด VAT"}</small></div>
-            <div className="mobile-preview-action"><button type="button" className="button button-download" onClick={handlePdfExport} disabled={isExporting}><FileDown size={16} /> {isExporting ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button></div>
+            <div className="mobile-preview-action"><button type="button" className="button button-download" onClick={requestPdfExport} disabled={isExporting}><FileDown size={16} /> {isExporting ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button></div>
           </section>
 
           <aside ref={previewColumnRef} className="document-preview-column">
-            <div className="preview-toolbar print-hide"><span><Info size={15} /> ตัวอย่างเอกสาร</span><div className="preview-toolbar-actions"><div className="preview-zoom-controls" role="group" aria-label="ปรับขนาดตัวอย่างเอกสาร"><button type="button" onClick={() => updatePreviewZoom(previewZoom - 1)} disabled={previewZoom === -1} aria-label="ซูมออก" title="ซูมออก"><ZoomOut size={15} /></button><output className="preview-zoom-percentage" aria-live="polite" aria-label={`ระดับซูมปัจจุบัน ${previewZoomLabel}`}>{previewZoomLabel}</output><button type="button" onClick={() => updatePreviewZoom(previewZoom + 1)} disabled={previewZoom === 1} aria-label="ซูมเข้า" title="ซูมเข้า"><ZoomIn size={15} /></button><button type="button" className="zoom-reset-button" onClick={resetPreviewView} disabled={previewZoom === 0} aria-label="รีเซ็ตขนาดตัวอย่าง" title="รีเซ็ตขนาด"><RotateCcw size={14} /></button></div><AlertDialog><AlertDialogTrigger asChild><button type="button" className="zoom-storage-reset-button" aria-label="ล้างค่าซูมที่จำไว้สำหรับอุปกรณ์นี้" title="ล้างค่าซูมที่จำไว้"><RotateCcw size={14} /> ล้างค่าซูม</button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ล้างค่าซูมที่จำไว้?</AlertDialogTitle><AlertDialogDescription>การดำเนินการนี้จะคืนตัวอย่าง{meta.title}บน{previewZoomDevice === "mobile" ? "มือถือ" : "คอมพิวเตอร์"}เครื่องนี้เป็น 100% โดยไม่กระทบเอกสารหรืออุปกรณ์อื่น</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>ยกเลิก</AlertDialogCancel><AlertDialogAction onClick={resetSavedPreviewZoom}>ล้างค่าซูม</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><AlertDialog><AlertDialogTrigger asChild><button type="button" className="zoom-storage-reset-all-button" aria-label="ล้างค่าซูมทุกเอกสารบนอุปกรณ์นี้" title="ล้างค่าซูมทุกเอกสาร"><RotateCcw size={14} /> ล้างทั้งหมด</button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ล้างค่าซูมทุกเอกสาร?</AlertDialogTitle><AlertDialogDescription>การดำเนินการนี้จะล้างค่าซูมที่จำไว้ของเอกสารทุกประเภทบน{previewZoomDevice === "mobile" ? "มือถือ" : "คอมพิวเตอร์"}เครื่องนี้ และคืนตัวอย่างปัจจุบันเป็น 100% โดยไม่กระทบค่าบนอุปกรณ์อื่น</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>ยกเลิก</AlertDialogCancel><AlertDialogAction onClick={resetAllSavedPreviewZooms}>ล้างทุกเอกสาร</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><button type="button" onClick={handlePdfExport} disabled={isExporting}><Download size={15} /> {isExporting ? "กำลังสร้าง" : "PDF"}</button></div></div>
-            <div className={`preview-paper-wrap ${previewZoom === 1 ? "preview-pan-enabled" : ""} ${isPreviewResetAnimating ? "is-zoom-resetting" : ""}`} tabIndex={0} aria-label="ตัวอย่างเอกสาร รองรับการถ่างหรือหุบนิ้วเพื่อซูมบนมือถือ" onTouchStart={handlePreviewTouchStart} onTouchMove={handlePreviewTouchMove} onTouchEnd={handlePreviewTouchEnd} onTouchCancel={clearPreviewTouch}>{previewScrollIndicator && <div className="document-scroll-indicator print-hide" aria-live="polite"><span>กำลังดู</span><strong>{previewScrollIndicator.section}</strong><div className="scroll-indicator-track" aria-hidden="true"><i style={{ left: `${previewScrollIndicator.progress}%` }} /></div></div>}<span className="pinch-zoom-hint print-hide">{previewHint}</span><DocumentPreview document={document} accentColor={accentColor} template={template} screenZoom={previewZoom} screenPan={previewPan} activeHighlight={activePreviewHighlight} isStampEditable={Boolean(document.stampUrl)} onStampTransformChange={updateStampTransform} /></div>
+            <div className="preview-toolbar print-hide"><span><Info size={15} /> ตัวอย่างเอกสาร</span><div className="preview-toolbar-actions"><button type="button" className={`preview-highlight-toggle ${isPreviewHighlightEnabled ? "is-active" : ""}`} aria-pressed={isPreviewHighlightEnabled} onClick={() => setIsPreviewHighlightEnabled((enabled) => !enabled)} title={isPreviewHighlightEnabled ? "ปิดเอฟเฟกต์ไฮไลท์" : "เปิดเอฟเฟกต์ไฮไลท์"}>{isPreviewHighlightEnabled ? <Eye size={15} /> : <EyeOff size={15} />} <span>ไฮไลท์</span></button><div className="preview-zoom-controls" role="group" aria-label="ปรับขนาดตัวอย่างเอกสาร"><button type="button" onClick={() => updatePreviewZoom(previewZoom - 1)} disabled={previewZoom === -1} aria-label="ซูมออก" title="ซูมออก"><ZoomOut size={15} /></button><output className="preview-zoom-percentage" aria-live="polite" aria-label={`ระดับซูมปัจจุบัน ${previewZoomLabel}`}>{previewZoomLabel}</output><button type="button" onClick={() => updatePreviewZoom(previewZoom + 1)} disabled={previewZoom === 1} aria-label="ซูมเข้า" title="ซูมเข้า"><ZoomIn size={15} /></button><button type="button" className="zoom-reset-button" onClick={resetPreviewView} disabled={previewZoom === 0} aria-label="รีเซ็ตขนาดตัวอย่าง" title="รีเซ็ตขนาด"><RotateCcw size={14} /></button></div><AlertDialog><AlertDialogTrigger asChild><button type="button" className="zoom-storage-reset-button" aria-label="ล้างค่าซูมที่จำไว้สำหรับอุปกรณ์นี้" title="ล้างค่าซูมที่จำไว้"><RotateCcw size={14} /> ล้างค่าซูม</button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ล้างค่าซูมที่จำไว้?</AlertDialogTitle><AlertDialogDescription>การดำเนินการนี้จะคืนตัวอย่าง{meta.title}บน{previewZoomDevice === "mobile" ? "มือถือ" : "คอมพิวเตอร์"}เครื่องนี้เป็น 100% โดยไม่กระทบเอกสารหรืออุปกรณ์อื่น</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>ยกเลิก</AlertDialogCancel><AlertDialogAction onClick={resetSavedPreviewZoom}>ล้างค่าซูม</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><AlertDialog><AlertDialogTrigger asChild><button type="button" className="zoom-storage-reset-all-button" aria-label="ล้างค่าซูมทุกเอกสารบนอุปกรณ์นี้" title="ล้างค่าซูมทุกเอกสาร"><RotateCcw size={14} /> ล้างทั้งหมด</button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ล้างค่าซูมทุกเอกสาร?</AlertDialogTitle><AlertDialogDescription>การดำเนินการนี้จะล้างค่าซูมที่จำไว้ของเอกสารทุกประเภทบน{previewZoomDevice === "mobile" ? "มือถือ" : "คอมพิวเตอร์"}เครื่องนี้ และคืนตัวอย่างปัจจุบันเป็น 100% โดยไม่กระทบค่าบนอุปกรณ์อื่น</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>ยกเลิก</AlertDialogCancel><AlertDialogAction onClick={resetAllSavedPreviewZooms}>ล้างทุกเอกสาร</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><button type="button" onClick={requestPdfExport} disabled={isExporting}><Download size={15} /> {isExporting ? "กำลังสร้าง" : "PDF"}</button></div></div>
+            <div className={`preview-paper-wrap ${previewZoom === 1 ? "preview-pan-enabled" : ""} ${isPreviewResetAnimating ? "is-zoom-resetting" : ""}`} tabIndex={0} aria-label="ตัวอย่างเอกสาร รองรับการถ่างหรือหุบนิ้วเพื่อซูมบนมือถือ" onTouchStart={handlePreviewTouchStart} onTouchMove={handlePreviewTouchMove} onTouchEnd={handlePreviewTouchEnd} onTouchCancel={clearPreviewTouch}>{previewScrollIndicator && <div className="document-scroll-indicator print-hide" aria-live="polite"><span>กำลังดู</span><strong>{previewScrollIndicator.section}</strong><div className="scroll-indicator-track" aria-hidden="true"><i style={{ left: `${previewScrollIndicator.progress}%` }} /></div></div>}<span className="pinch-zoom-hint print-hide">{previewHint}</span><DocumentPreview document={document} accentColor={accentColor} template={template} screenZoom={previewZoom} screenPan={previewPan} activeHighlight={isPreviewHighlightEnabled ? activePreviewHighlight : null} isStampEditable={Boolean(document.stampUrl)} onStampTransformChange={updateStampTransform} /></div>
             <div className="convert-card print-hide"><div><FilePlus2 size={20} /><span><strong>ทำเอกสารต่อเนื่อง</strong><small>นำข้อมูลชุดนี้ไปสร้างเอกสารถัดไปได้ทันที</small></span></div><div className="convert-buttons">{convertTargets[kind].map((target) => <button type="button" key={target} onClick={() => handleConvert(target)}>{documentMeta[target].title}<ArrowRight size={14} /></button>)}</div></div>
           </aside>
         </div>

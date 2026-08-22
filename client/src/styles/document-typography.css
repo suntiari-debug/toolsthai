@@ -314,8 +314,72 @@
 .stamp-transform-controls button { grid-column: 1 / -1; justify-self: start; padding: 0; border: 0; color: #0d7a75; background: transparent; font: inherit; font-size: .64rem; font-weight: 700; }
 .stamp-transform-controls button:hover { text-decoration: underline; }
 
+.logo-transform-controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: .55rem .75rem;
+  align-items: center;
+  margin-top: .85rem;
+  padding: .7rem;
+  border: 1px solid #d8e4df;
+  border-radius: .65rem;
+  background: #f7fbf9;
+}
+
+.logo-transform-controls > div:first-child { display: grid; gap: .1rem; }
+.logo-transform-controls strong { color: #304045; font-size: .73rem; }
+.logo-transform-controls span { color: #6a7b77; font-size: .61rem; line-height: 1.45; }
+.logo-transform-controls label { display: grid; grid-template-columns: auto minmax(4.5rem, 1fr) auto; align-items: center; gap: .35rem; color: #536562; font-size: .65rem; }
+.logo-transform-controls input { accent-color: #0d7a75; }
+.logo-transform-controls output { min-width: 2.2rem; color: #0d7a75; font-family: "DM Sans", sans-serif; font-size: .62rem; font-weight: 700; text-align: right; }
+.logo-transform-controls .logo-align-actions { grid-column: 1 / -1; display: flex; gap: .35rem; flex-wrap: wrap; }
+.logo-transform-controls .logo-align-actions button,
+.logo-transform-controls .reset-logo-transform { padding: .34rem .5rem; border: 1px solid #cce0d9; border-radius: .38rem; color: #0d6e72; background: #fff; font: inherit; font-size: .62rem; font-weight: 700; }
+.logo-transform-controls .reset-logo-transform { grid-column: 1 / -1; justify-self: start; border: 0; padding: 0; background: transparent; }
+.logo-transform-controls button:hover { background: #e7f3ee; }
+.logo-transform-controls .reset-logo-transform:hover { background: transparent; text-decoration: underline; }
+
+.document-tool-page .pdf-logo-frame {
+  display: grid;
+  flex: 0 0 auto;
+  width: 55px;
+  height: 55px;
+  overflow: hidden;
+  border-radius: 11px 11px 11px 3px;
+  background: #fff;
+  transform: translate(var(--logo-offset-x), var(--logo-offset-y)) scale(var(--logo-scale));
+  transform-origin: center;
+}
+
+.document-tool-page .pdf-logo-frame .pdf-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0;
+  background: transparent;
+  filter: brightness(var(--logo-brightness)) contrast(var(--logo-contrast));
+  transform: translate(var(--logo-crop-x), var(--logo-crop-y)) scale(var(--logo-crop-zoom));
+  transform-origin: center;
+}
+
+.pdf-validation-list { display: grid; gap: .55rem; margin: 0; padding: .8rem; border: 1px solid #f1d3b9; border-radius: .65rem; background: #fff8f1; list-style: none; }
+.pdf-validation-list li { display: grid; gap: .08rem; color: #7a4b2e; font-size: .8rem; line-height: 1.45; }
+.pdf-validation-list strong { color: #63381f; }
+.pdf-validation-list span { color: #8a5a3c; }
+
+.logo-editor-dialog { max-width: min(34rem, calc(100vw - 2rem)); }
+.logo-crop-preview { display: grid; width: min(100%, 18rem); height: 10rem; place-items: center; overflow: hidden; justify-self: center; border: 1px solid #dbe5e0; border-radius: .75rem; background: repeating-conic-gradient(#f4f7f5 0 25%, #fff 0 50%) 50% / 1.1rem 1.1rem; }
+.logo-crop-preview img { width: 74%; height: 74%; object-fit: contain; filter: brightness(var(--logo-brightness)) contrast(var(--logo-contrast)); transform: translate(var(--logo-crop-x), var(--logo-crop-y)) scale(var(--logo-crop-zoom)); transform-origin: center; }
+.logo-editor-controls { display: grid; gap: .65rem; }
+.logo-editor-controls label { display: grid; grid-template-columns: 5.75rem minmax(5rem, 1fr) 2.8rem; align-items: center; gap: .55rem; color: #465853; font-size: .78rem; }
+.logo-editor-controls input { accent-color: #0d7a75; }
+.logo-editor-controls output { color: #0d6e72; font-family: "DM Sans", sans-serif; font-size: .72rem; font-weight: 700; text-align: right; }
+
 @media (max-width: 540px) {
-  .stamp-transform-controls { grid-template-columns: 1fr; }
+  .stamp-transform-controls,
+  .logo-transform-controls { grid-template-columns: 1fr; }
+  .logo-editor-controls label { grid-template-columns: 1fr; gap: .25rem; }
+  .logo-editor-controls output { text-align: left; }
 }
 
 @media print {
@@ -475,6 +539,18 @@
   display: flex;
   align-items: center;
   gap: .45rem;
+}
+
+.preview-highlight-toggle {
+  border: 1px solid #c7d9d2 !important;
+  color: #61736f !important;
+  background: #fff !important;
+}
+
+.preview-highlight-toggle.is-active {
+  border-color: #a9d1c4 !important;
+  color: #0d6e72 !important;
+  background: #e8f5f0 !important;
 }
 
 .preview-zoom-controls {

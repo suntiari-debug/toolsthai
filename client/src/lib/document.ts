@@ -13,6 +13,34 @@ export type StampPosition = { x: number; y: number };
 export const defaultStampPosition: StampPosition = { x: 78, y: 72 };
 export const defaultStampScale = 1;
 
+export type LogoPosition = { x: number; y: number };
+export type LogoCrop = { zoom: number; x: number; y: number; brightness: number; contrast: number };
+export const defaultLogoPosition: LogoPosition = { x: 0, y: 0 };
+export const defaultLogoScale = 1;
+export const defaultLogoCrop: LogoCrop = { zoom: 1, x: 0, y: 0, brightness: 100, contrast: 100 };
+
+function boundedValue(value: number, minimum: number, maximum: number, fallback: number) {
+  return Math.round(Math.min(maximum, Math.max(minimum, Number(value) || fallback)) * 100) / 100;
+}
+
+export function boundedLogoPosition(position: LogoPosition): LogoPosition {
+  return { x: boundedValue(position.x, -24, 24, defaultLogoPosition.x), y: boundedValue(position.y, -18, 18, defaultLogoPosition.y) };
+}
+
+export function boundedLogoScale(scale: number) {
+  return boundedValue(scale, .65, 1.45, defaultLogoScale);
+}
+
+export function boundedLogoCrop(crop: Partial<LogoCrop> | undefined): LogoCrop {
+  return {
+    zoom: boundedValue(crop?.zoom ?? defaultLogoCrop.zoom, 1, 2.4, defaultLogoCrop.zoom),
+    x: boundedValue(crop?.x ?? defaultLogoCrop.x, -34, 34, defaultLogoCrop.x),
+    y: boundedValue(crop?.y ?? defaultLogoCrop.y, -34, 34, defaultLogoCrop.y),
+    brightness: boundedValue(crop?.brightness ?? defaultLogoCrop.brightness, 70, 130, defaultLogoCrop.brightness),
+    contrast: boundedValue(crop?.contrast ?? defaultLogoCrop.contrast, 70, 130, defaultLogoCrop.contrast),
+  };
+}
+
 export function boundedStampPosition(position: StampPosition): StampPosition {
   return { x: Math.round(Math.min(88, Math.max(16, Number(position.x) || defaultStampPosition.x)) * 10) / 10, y: Math.round(Math.min(82, Math.max(18, Number(position.y) || defaultStampPosition.y)) * 10) / 10 };
 }
@@ -51,6 +79,9 @@ export type BusinessDocument = {
   stampUrl?: string;
   stampPosition?: StampPosition;
   stampScale?: number;
+  logoPosition?: LogoPosition;
+  logoScale?: number;
+  logoCrop?: LogoCrop;
   watermark: boolean;
 };
 
@@ -101,6 +132,9 @@ export function createInitialDocument(kind: DocumentKind): BusinessDocument {
     stampUrl: "",
     stampPosition: { ...defaultStampPosition },
     stampScale: defaultStampScale,
+    logoPosition: { ...defaultLogoPosition },
+    logoScale: defaultLogoScale,
+    logoCrop: { ...defaultLogoCrop },
     watermark: false,
   };
 }
@@ -127,6 +161,9 @@ export function restoreDocument(payload: string, activeKind: DocumentKind): Busi
     stampUrl: document.stampUrl || "",
     stampPosition: boundedStampPosition(document.stampPosition || defaultStampPosition),
     stampScale: boundedStampScale(document.stampScale || defaultStampScale),
+    logoPosition: boundedLogoPosition(document.logoPosition || defaultLogoPosition),
+    logoScale: boundedLogoScale(document.logoScale || defaultLogoScale),
+    logoCrop: boundedLogoCrop(document.logoCrop),
     company: { ...document.company },
     customer: { ...document.customer },
     items: document.items.map((item) => ({ ...item })),
