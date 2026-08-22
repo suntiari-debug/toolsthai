@@ -387,6 +387,25 @@
   touch-action: pan-y;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .document-tool-page .preview-paper-wrap.is-zoom-resetting .document-preview {
+    will-change: transform;
+    transition: transform 260ms cubic-bezier(.23, 1, .32, 1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .document-tool-page .preview-paper-wrap.is-zoom-resetting .document-preview {
+    transition: none !important;
+  }
+}
+
+@media print {
+  .document-tool-page .preview-paper-wrap.is-zoom-resetting .document-preview {
+    transition: none !important;
+  }
+}
+
 .pinch-zoom-hint {
   display: none;
 }

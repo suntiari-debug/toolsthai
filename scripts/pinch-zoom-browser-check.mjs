@@ -109,6 +109,10 @@ try {
   await dispatchTap(page, ".preview-paper-wrap", tapX + 4, tapY + 3);
   await page.waitForTimeout(80);
   if (await zoomOutput.textContent() !== "100%") throw new Error("Double tap did not reset the preview zoom");
+  const resetAnimation = await wrap.evaluate((element) => element.classList.contains("is-zoom-resetting"));
+  if (!resetAnimation) throw new Error("Zoom reset did not activate the smooth transition state");
+  const transitionProperties = await page.locator(".document-preview").evaluate((element) => getComputedStyle(element).transitionProperty);
+  if (!transitionProperties.includes("transform")) throw new Error("Zoom reset did not apply a transform transition");
   const resetPan = await page.locator(".document-preview").evaluate((element) => ({
     x: Number.parseFloat(element.style.getPropertyValue("--preview-pan-x")),
     y: Number.parseFloat(element.style.getPropertyValue("--preview-pan-y")),
@@ -185,6 +189,16 @@ try {
     throw new Error("Current device reset incorrectly changed the desktop quotation zoom preference");
   }
   await desktopContext.close();
+
+  const reducedContext = await browser.newContext({ viewport: { width: 430, height: 850 }, hasTouch: true, isMobile: true, reducedMotion: "reduce" });
+  const reducedPage = await reducedContext.newPage();
+  await reducedPage.goto("http://127.0.0.1:3000/quotation", { waitUntil: "networkidle" });
+  await reducedPage.locator('button[aria-label="ซูมเข้า"]').evaluate((button) => button.click());
+  await reducedPage.locator('button[aria-label="รีเซ็ตขนาดตัวอย่าง"]').evaluate((button) => button.click());
+  await reducedPage.waitForTimeout(40);
+  const reducedTransitionDuration = await reducedPage.locator(".document-preview").evaluate((element) => getComputedStyle(element).transitionDuration);
+  if (reducedTransitionDuration !== "0s") throw new Error("Reduced motion did not disable the zoom reset transition");
+  await reducedContext.close();
 
   const hasScroll = await wrap.evaluate((element) => element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight);
   if (hasScroll) throw new Error("Pinch gesture introduced an internal preview scrollbar");
