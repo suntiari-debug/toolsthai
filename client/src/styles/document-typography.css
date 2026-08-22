@@ -44,6 +44,36 @@
   font-size: .72rem;
 }
 
+.document-tool-page .design-preview-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .38rem;
+  margin-top: .85rem;
+  padding: .54rem .72rem;
+  border: 1px solid #b8d4cc;
+  border-radius: .55rem;
+  color: #0a5d60;
+  background: #edf7f3;
+  font-size: .75rem;
+  font-weight: 700;
+  transition: transform .16s ease, background .16s ease;
+}
+
+.document-tool-page .design-preview-link:hover {
+  background: #dcefe9;
+  transform: translateY(-1px);
+}
+
+.document-tool-page .design-preview-link:active {
+  transform: scale(.97);
+}
+
+@media (min-width: 821px) {
+  .document-tool-page .design-preview-link {
+    display: none;
+  }
+}
+
 .document-tool-page .asset-upload-tile strong,
 .document-tool-page .asset-static-tile > span,
 .document-tool-page .item-editor-top,

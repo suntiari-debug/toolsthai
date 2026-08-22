@@ -1,6 +1,6 @@
 import { ChangeEvent, TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, ArrowRight, Download, FileDown, FilePlus2, Info, Plus, Printer, RotateCcw, Save, ShieldCheck, Trash2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Eye, FileDown, FilePlus2, Info, Plus, Printer, RotateCcw, Save, ShieldCheck, Trash2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
 import PublicFooter from "@/components/PublicFooter";
 import PublicHeader from "@/components/PublicHeader";
 import DocumentPreview from "@/components/DocumentPreview";
@@ -14,7 +14,7 @@ import SeoMeta from "@/components/SeoMeta";
 import { getDocumentSeo, getDocumentStructuredData } from "@shared/seo";
 import { validateDocumentAssetFile } from "@/lib/documentAssets";
 import "../styles/document-typography.css";
-import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
+import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollBehavior, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
 
 type DocumentToolProps = { kind: DocumentKind };
 type DocumentTemplate = "modern" | "classic" | "minimal";
@@ -54,6 +54,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const lastTap = useRef<TapPoint | null>(null);
   const skipPreviewZoomPersistence = useRef<string | null>(null);
   const previewResetAnimationTimer = useRef<number | null>(null);
+  const previewColumnRef = useRef<HTMLElement | null>(null);
   const profileQuery = trpc.companyProfile.get.useQuery(undefined, { enabled: isAuthenticated });
   const flashNotice = (message: string) => {
     setNotice(message);
@@ -71,6 +72,10 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const previewScrollIndicator = previewZoom === 1 ? getPreviewScrollIndicator(previewPan.y, 188) : null;
   const previewZoomStorageKey = getPreviewZoomStorageKey(kind, previewZoomDevice);
   const updatePreviewZoom = (value: number) => setPreviewZoom(boundedPreviewZoom(value));
+  const scrollToPreview = () => {
+    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    previewColumnRef.current?.scrollIntoView({ behavior: getPreviewScrollBehavior(prefersReducedMotion), block: "start" });
+  };
   useEffect(() => {
     const syncPreviewZoomDevice = () => setPreviewZoomDevice(getPreviewZoomDevice(window.innerWidth));
     syncPreviewZoomDevice();
@@ -316,6 +321,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
               {document.stampUrl && <div className="stamp-transform-controls"><div><strong>จัดวางตรายาง</strong><span>ลากตรายางบนตัวอย่างเอกสารเพื่อย้ายตำแหน่ง หรือลากจุดมุมเพื่อปรับขนาด</span></div><label>ขนาด <input type="range" min="0.6" max="1.7" step="0.05" value={boundedStampScale(document.stampScale || defaultStampScale)} onChange={(event) => updateStampTransform({ position: document.stampPosition || defaultStampPosition, scale: Number(event.target.value) })} /><output>{Math.round(boundedStampScale(document.stampScale || defaultStampScale) * 100)}%</output></label><button type="button" onClick={resetStampTransform}>จัดวางใหม่</button></div>}
               {profileQuery.data && <button type="button" className="apply-template-button" onClick={applySavedCompany}>ใช้ template บริษัทที่บันทึก</button>}
               <p className="design-hint">แนะนำ: ใช้ไฟล์ PNG พื้นหลังโปร่งใสสำหรับลายเซ็นและตรายาง ขนาดไม่เกิน 500 KB เพื่อให้ดูคมชัดใน PDF</p>
+              <button type="button" className="design-preview-link" onClick={scrollToPreview}><Eye size={15} /> ดูตัวอย่างที่อัปเดต</button>
             </section>
 
             <section className="form-section">
@@ -360,7 +366,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
             <div className="mobile-preview-action"><button type="button" className="button button-download" onClick={handlePdfExport} disabled={isExporting}><FileDown size={16} /> {isExporting ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button></div>
           </section>
 
-          <aside className="document-preview-column">
+          <aside ref={previewColumnRef} className="document-preview-column">
             <div className="preview-toolbar print-hide"><span><Info size={15} /> ตัวอย่างเอกสาร</span><div className="preview-toolbar-actions"><div className="preview-zoom-controls" role="group" aria-label="ปรับขนาดตัวอย่างเอกสาร"><button type="button" onClick={() => updatePreviewZoom(previewZoom - 1)} disabled={previewZoom === -1} aria-label="ซูมออก" title="ซูมออก"><ZoomOut size={15} /></button><output className="preview-zoom-percentage" aria-live="polite" aria-label={`ระดับซูมปัจจุบัน ${previewZoomLabel}`}>{previewZoomLabel}</output><button type="button" onClick={() => updatePreviewZoom(previewZoom + 1)} disabled={previewZoom === 1} aria-label="ซูมเข้า" title="ซูมเข้า"><ZoomIn size={15} /></button><button type="button" className="zoom-reset-button" onClick={resetPreviewView} disabled={previewZoom === 0} aria-label="รีเซ็ตขนาดตัวอย่าง" title="รีเซ็ตขนาด"><RotateCcw size={14} /></button></div><AlertDialog><AlertDialogTrigger asChild><button type="button" className="zoom-storage-reset-button" aria-label="ล้างค่าซูมที่จำไว้สำหรับอุปกรณ์นี้" title="ล้างค่าซูมที่จำไว้"><RotateCcw size={14} /> ล้างค่าซูม</button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ล้างค่าซูมที่จำไว้?</AlertDialogTitle><AlertDialogDescription>การดำเนินการนี้จะคืนตัวอย่าง{meta.title}บน{previewZoomDevice === "mobile" ? "มือถือ" : "คอมพิวเตอร์"}เครื่องนี้เป็น 100% โดยไม่กระทบเอกสารหรืออุปกรณ์อื่น</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>ยกเลิก</AlertDialogCancel><AlertDialogAction onClick={resetSavedPreviewZoom}>ล้างค่าซูม</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><AlertDialog><AlertDialogTrigger asChild><button type="button" className="zoom-storage-reset-all-button" aria-label="ล้างค่าซูมทุกเอกสารบนอุปกรณ์นี้" title="ล้างค่าซูมทุกเอกสาร"><RotateCcw size={14} /> ล้างทั้งหมด</button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ล้างค่าซูมทุกเอกสาร?</AlertDialogTitle><AlertDialogDescription>การดำเนินการนี้จะล้างค่าซูมที่จำไว้ของเอกสารทุกประเภทบน{previewZoomDevice === "mobile" ? "มือถือ" : "คอมพิวเตอร์"}เครื่องนี้ และคืนตัวอย่างปัจจุบันเป็น 100% โดยไม่กระทบค่าบนอุปกรณ์อื่น</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>ยกเลิก</AlertDialogCancel><AlertDialogAction onClick={resetAllSavedPreviewZooms}>ล้างทุกเอกสาร</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><button type="button" onClick={handlePdfExport} disabled={isExporting}><Download size={15} /> {isExporting ? "กำลังสร้าง" : "PDF"}</button></div></div>
             <div className={`preview-paper-wrap ${previewZoom === 1 ? "preview-pan-enabled" : ""} ${isPreviewResetAnimating ? "is-zoom-resetting" : ""}`} tabIndex={0} aria-label="ตัวอย่างเอกสาร รองรับการถ่างหรือหุบนิ้วเพื่อซูมบนมือถือ" onTouchStart={handlePreviewTouchStart} onTouchMove={handlePreviewTouchMove} onTouchEnd={handlePreviewTouchEnd} onTouchCancel={clearPreviewTouch}>{previewScrollIndicator && <div className="document-scroll-indicator print-hide" aria-live="polite"><span>กำลังดู</span><strong>{previewScrollIndicator.section}</strong><div className="scroll-indicator-track" aria-hidden="true"><i style={{ left: `${previewScrollIndicator.progress}%` }} /></div></div>}<span className="pinch-zoom-hint print-hide">{previewHint}</span><DocumentPreview document={document} accentColor={accentColor} template={template} screenZoom={previewZoom} screenPan={previewPan} isStampEditable={Boolean(document.stampUrl)} onStampTransformChange={updateStampTransform} /></div>
             <div className="convert-card print-hide"><div><FilePlus2 size={20} /><span><strong>ทำเอกสารต่อเนื่อง</strong><small>นำข้อมูลชุดนี้ไปสร้างเอกสารถัดไปได้ทันที</small></span></div><div className="convert-buttons">{convertTargets[kind].map((target) => <button type="button" key={target} onClick={() => handleConvert(target)}>{documentMeta[target].title}<ArrowRight size={14} /></button>)}</div></div>

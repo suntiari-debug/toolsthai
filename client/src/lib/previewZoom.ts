@@ -56,6 +56,10 @@ export function getPreviewScrollIndicator(panY: number, limitY: number): Preview
   return { section: "ส่วนล่าง", progress };
 }
 
+export function getPreviewScrollBehavior(prefersReducedMotion: boolean): ScrollBehavior {
+  return prefersReducedMotion ? "auto" : "smooth";
+}
+
 export function isDoubleTap(previous: TapPoint | null, current: TapPoint, maxDelay = 280, maxDistance = 32): boolean {
   if (!previous) return false;
   const delay = current.timestamp - previous.timestamp;
