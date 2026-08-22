@@ -116,6 +116,17 @@ try {
   if (resetPan.x !== 0 || resetPan.y !== 0) throw new Error("Preview pan did not reset after double tap");
   if (await indicator.count() !== 0) throw new Error("Scroll indicator did not hide after double-tap reset");
 
+  await page.locator('button[aria-label="ซูมเข้า"]').evaluate((button) => button.click());
+  await page.waitForTimeout(80);
+  if (await zoomOutput.textContent() !== "110%") throw new Error("Zoom control did not update the current preview before persistence check");
+  if (await page.evaluate(() => window.localStorage.getItem("toolsthai.preview-zoom")) !== "1") {
+    throw new Error("Current preview zoom was not stored in the device");
+  }
+  await page.reload({ waitUntil: "networkidle" });
+  if (await page.locator(".preview-zoom-controls output").textContent() !== "110%") {
+    throw new Error("Stored preview zoom was not restored after opening the document again");
+  }
+
   const hasScroll = await wrap.evaluate((element) => element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight);
   if (hasScroll) throw new Error("Pinch gesture introduced an internal preview scrollbar");
 

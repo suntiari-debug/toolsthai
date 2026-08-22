@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { boundedPreviewZoom, clampPreviewPan, getPreviewScrollIndicator, isDoubleTap, pinchZoomStep } from "./previewZoom";
+import { boundedPreviewZoom, clampPreviewPan, getPreviewScrollIndicator, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep } from "./previewZoom";
 
 describe("preview zoom controls", () => {
   it("limits all requested levels to the supported range", () => {
     expect(boundedPreviewZoom(-10)).toBe(-1);
     expect(boundedPreviewZoom(0)).toBe(0);
     expect(boundedPreviewZoom(8)).toBe(1);
+  });
+
+  it("restores only supported persisted zoom levels", () => {
+    expect(parseStoredPreviewZoom("-1")).toBe(-1);
+    expect(parseStoredPreviewZoom("1")).toBe(1);
+    expect(parseStoredPreviewZoom("999")).toBe(0);
+    expect(parseStoredPreviewZoom(null)).toBe(0);
   });
 
   it("turns a pinch out gesture into one larger zoom level", () => {

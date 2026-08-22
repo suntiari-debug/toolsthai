@@ -9,6 +9,12 @@ export function boundedPreviewZoom(value: number): PreviewZoom {
   return 0;
 }
 
+export function parseStoredPreviewZoom(value: string | null): PreviewZoom {
+  if (value === "-1") return -1;
+  if (value === "1") return 1;
+  return 0;
+}
+
 export function pinchZoomStep(startDistance: number, currentDistance: number, startZoom: PreviewZoom): PreviewZoom {
   if (!Number.isFinite(startDistance) || !Number.isFinite(currentDistance) || startDistance <= 0 || currentDistance <= 0) return startZoom;
   const ratio = currentDistance / startDistance;
