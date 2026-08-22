@@ -30,7 +30,7 @@ export default function Home() {
         <section className="hero shell">
           <div className="hero-copy">
             <p className="eyebrow"><span /> BUSINESS UTILITIES, MADE FOR THAI WORK</p>
-            <h1>สร้างเอกสารธุรกิจ<br /><em>ออนไลน์ฟรี</em><br />สำหรับธุรกิจไทย</h1>
+            <h1>เครื่องมือเอกสาร<br /><em>ธุรกิจออนไลน์ฟรี</em><br />สำหรับ SME ไทย</h1>
             <p className="hero-description">
               {homeSeo.intro}
             </p>

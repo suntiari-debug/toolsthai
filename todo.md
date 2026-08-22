@@ -113,3 +113,6 @@
 - [x] ตรวจ Title Tag และ H1 ปัจจุบันของหน้าแรกกับหน้า Quotation
 - [x] เทียบแนวทาง Google สำหรับ title links และการจัดหัวข้อหน้าเว็บ
 - [x] ออกแบบ Title Tag และ H1 ที่แบ่งเจตนาค้นหาระหว่างหน้าแรกกับหน้า Quotation ชัดเจน
+- [x] อัปเดต Title Tag และ H1 หน้าแรกให้เน้นเครื่องมือเอกสารธุรกิจออนไลน์ฟรี
+- [x] อัปเดต Title Tag หน้า Quotation ให้เน้นการสร้างใบเสนอราคาออนไลน์พร้อม PDF และโลโก้
+- [x] ปรับ regression tests และตรวจ SSR, raw HTML, TypeScript และ UI หลังอัปเดต SEO copy
