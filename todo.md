@@ -116,3 +116,7 @@
 - [x] อัปเดต Title Tag และ H1 หน้าแรกให้เน้นเครื่องมือเอกสารธุรกิจออนไลน์ฟรี
 - [x] อัปเดต Title Tag หน้า Quotation ให้เน้นการสร้างใบเสนอราคาออนไลน์พร้อม PDF และโลโก้
 - [x] ปรับ regression tests และตรวจ SSR, raw HTML, TypeScript และ UI หลังอัปเดต SEO copy
+- [x] ตรวจ analytics integration และกำหนดเหตุการณ์ CTA กับ Tool Card ที่ต้องติดตาม
+- [x] เพิ่ม privacy-safe event schema และ helper สำหรับ Landing Page tracking
+- [x] เชื่อม Tracking Event กับ CTA และ Tool Card ของหน้าแรก
+- [x] เพิ่ม regression tests และตรวจการส่ง event โดยไม่เก็บข้อมูลเอกสารส่วนบุคคล

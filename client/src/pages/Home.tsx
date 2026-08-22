@@ -6,6 +6,7 @@ import {
 import PublicFooter from "@/components/PublicFooter";
 import PublicHeader from "@/components/PublicHeader";
 import SeoMeta from "@/components/SeoMeta";
+import { trackLandingCtaClick, trackLandingToolCardClick } from "@/lib/analytics";
 import { homeSeo } from "@shared/seo";
 
 const documentTools = [
@@ -35,8 +36,8 @@ export default function Home() {
               {homeSeo.intro}
             </p>
             <div className="hero-actions">
-              <Link href="/quotation" className="button button-primary">สร้างใบเสนอราคาฟรี <ArrowRight size={18} /></Link>
-              <a href="#tools" className="text-button">ดูเครื่องมือทั้งหมด <ArrowDownIcon /></a>
+              <Link href="/quotation" className="button button-primary" onClick={() => trackLandingCtaClick("hero_primary", "/quotation")}>สร้างใบเสนอราคาฟรี <ArrowRight size={18} /></Link>
+              <a href="#tools" className="text-button" onClick={() => trackLandingCtaClick("hero_tools", "#tools")}>ดูเครื่องมือทั้งหมด <ArrowDownIcon /></a>
             </div>
             <div className="hero-reassurance">
               <span><BadgeCheck size={17} /> ใช้ฟรี ไม่ต้องสมัคร</span>
@@ -78,7 +79,7 @@ export default function Home() {
           </div>
           <div className="tool-card-grid">
             {documentTools.map(({ href, icon: Icon, title, description, accent }) => (
-              <Link href={href} className={`tool-card card-${accent}`} key={href}>
+              <Link href={href} className={`tool-card card-${accent}`} key={href} onClick={() => trackLandingToolCardClick("document", href.slice(1))}>
                 <div className="tool-icon"><Icon size={25} strokeWidth={1.75} /></div>
                 <span className="tool-number">0{documentTools.findIndex((tool) => tool.href === href) + 1}</span>
                 <h3>{title}</h3>
@@ -90,7 +91,7 @@ export default function Home() {
           <div className="document-flow" id="how-it-works">
             <div className="flow-label"><span>ทำงานต่อเนื่อง</span><strong>จากเอกสารหนึ่ง สู่ขั้นตอนถัดไป</strong></div>
             <div className="flow-steps"><span>ใบเสนอราคา</span><i /><span>ใบแจ้งหนี้</span><i /><span>ใบเสร็จรับเงิน</span><i /><span>ใบส่งของ</span></div>
-            <Link href="/quotation" className="button button-ink">เริ่มจากใบเสนอราคา <ArrowRight size={17} /></Link>
+            <Link href="/quotation" className="button button-ink" onClick={() => trackLandingCtaClick("document_flow", "/quotation")}>เริ่มจากใบเสนอราคา <ArrowRight size={17} /></Link>
           </div>
         </section>
 
@@ -111,7 +112,7 @@ export default function Home() {
               <p>จากต้นทุนสู่ราคาขายที่เหมาะสม คำนวณ Margin, Markup และ VAT เพื่อให้ทุกการตัดสินใจมีตัวเลขรองรับ</p>
               <div className="calculator-links">
                 {calculatorTools.map(({ href, icon: Icon, title, description }) => (
-                  <Link href={href} key={href} className="calculator-link"><Icon size={21} /><span><strong>{title}</strong><small>{description}</small></span><ArrowUpRight size={18} /></Link>
+                  <Link href={href} key={href} className="calculator-link" onClick={() => trackLandingToolCardClick("calculator", href.slice(1))}><Icon size={21} /><span><strong>{title}</strong><small>{description}</small></span><ArrowUpRight size={18} /></Link>
                 ))}
               </div>
             </div>
@@ -131,7 +132,7 @@ export default function Home() {
           <div className="cta-card">
             <p className="eyebrow"><span /> เริ่มต้นวันนี้</p>
             <h2>เอกสารชิ้นถัดไปของคุณ<br />ควรทำได้ง่ายกว่านี้</h2>
-            <Link href="/quotation" className="button button-primary">สร้างใบเสนอราคา ฟรี <ArrowRight size={18} /></Link>
+            <Link href="/quotation" className="button button-primary" onClick={() => trackLandingCtaClick("bottom_primary", "/quotation")}>สร้างใบเสนอราคา ฟรี <ArrowRight size={18} /></Link>
             <span className="cta-note">ไม่ต้องสมัครสมาชิก · ใช้งานได้ทันที</span>
           </div>
         </section>
