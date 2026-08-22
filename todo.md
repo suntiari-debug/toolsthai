@@ -103,3 +103,7 @@
 - [x] ตรวจกลไก SSR ปัจจุบันและกำหนดขอบเขต SSR สำหรับหน้าแรก
 - [x] ออกแบบ metadata และเนื้อหา SEO ที่หน้าแรกต้องส่งจากเซิร์ฟเวอร์
 - [x] จัดทำขั้นตอนปรับโค้ด ทดสอบ และเผยแพร่ SSR หน้าแรกอย่างปลอดภัย
+- [x] เพิ่ม metadata SEO และ SSR route สำหรับหน้าแรก `/`
+- [x] ปรับ H1 และข้อความ Hero หน้าแรกให้สื่อ search intent ของเครื่องมือธุรกิจไทยชัดเจน
+- [x] แก้ robots.txt และ sitemap.xml ให้ใช้ canonical domain ปัจจุบัน
+- [x] เพิ่ม SSR verification สำหรับหน้าแรกและรัน TypeScript, Vitest, build, SSR, raw HTML และ hydration checks

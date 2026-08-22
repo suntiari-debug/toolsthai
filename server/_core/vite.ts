@@ -9,7 +9,7 @@ import { CANONICAL_ORIGIN, SITE_NAME, type SsrHead } from "../../shared/seo";
 
 const escapeHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 const cleanText = (value: string, max: number) => Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
-const isSeoPath = (pathName: string) => pathName === "/quotation" || pathName === "/invoice";
+const isSeoPath = (pathName: string) => pathName === "/" || pathName === "/quotation" || pathName === "/invoice";
 
 function composeHtml(template: string, html: string, head: SsrHead, state: unknown) {
   const title = escapeHtml(cleanText(head.title, 70));

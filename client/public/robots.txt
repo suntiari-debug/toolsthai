@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://toolsthai.manus.space/sitemap.xml
+Sitemap: https://toolsthai-gzgjhprz.manus.space/sitemap.xml

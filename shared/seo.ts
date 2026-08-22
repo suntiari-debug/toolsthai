@@ -21,8 +21,24 @@ export type SsrHead = {
   jsonLd: unknown[];
 };
 
+export type HomeSeoProfile = {
+  path: "/";
+  title: string;
+  description: string;
+  h1: string;
+  intro: string;
+};
+
 export const SITE_NAME = "Tools Thai";
 export const CANONICAL_ORIGIN = "https://toolsthai-gzgjhprz.manus.space";
+
+export const homeSeo: HomeSeoProfile = {
+  path: "/",
+  title: "Tools Thai: สร้างใบเสนอราคา ใบแจ้งหนี้ และเอกสารธุรกิจออนไลน์ฟรี",
+  description: "สร้างใบเสนอราคา ใบแจ้งหนี้ ใบเสร็จรับเงิน ใบกำกับภาษี และใบส่งของออนไลน์ฟรี พร้อมดาวน์โหลด PDF ภาษาไทย และเครื่องคำนวณธุรกิจสำหรับ SME ไทย",
+  h1: "สร้างเอกสารธุรกิจออนไลน์ฟรี สำหรับธุรกิจไทย",
+  intro: "ออกใบเสนอราคา ใบแจ้งหนี้ ใบเสร็จรับเงิน และคำนวณต้นทุนได้จากที่เดียว พร้อม PDF ภาษาไทย ไม่ต้องสมัคร",
+};
 
 export const documentSeo: Record<DocumentSeoKind, DocumentSeoProfile> = {
   quotation: {
@@ -80,9 +96,14 @@ function structuredData(kind: DocumentSeoKind): unknown[] {
   ];
 }
 
+function homeStructuredData(): unknown[] {
+  return [{ "@context": "https://schema.org", "@type": "WebSite", name: SITE_NAME, url: CANONICAL_ORIGIN, inLanguage: "th-TH" }];
+}
+
 export function getDocumentSeo(kind: string) { return kind === "quotation" || kind === "invoice" ? documentSeo[kind] : undefined; }
 export function getDocumentStructuredData(kind: string) { return kind === "quotation" || kind === "invoice" ? structuredData(kind) : undefined; }
 export function getSeoHead(path: string): SsrHead {
+  if (path === homeSeo.path) return { title: homeSeo.title, description: homeSeo.description, canonicalPath: homeSeo.path, jsonLd: homeStructuredData() };
   const kind = path.replace(/^\//, "") as DocumentSeoKind;
   const page = getDocumentSeo(kind);
   if (!page) throw new Error(`Unsupported SEO SSR route: ${path}`);

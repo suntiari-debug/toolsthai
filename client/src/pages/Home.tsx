@@ -6,6 +6,7 @@ import {
 import PublicFooter from "@/components/PublicFooter";
 import PublicHeader from "@/components/PublicHeader";
 import SeoMeta from "@/components/SeoMeta";
+import { homeSeo } from "@shared/seo";
 
 const documentTools = [
   { href: "/quotation", icon: FileCheck2, title: "ใบเสนอราคา", description: "เริ่มต้นการขายด้วยเอกสารที่ชัดเจนและน่าเชื่อถือ", accent: "coral" },
@@ -23,16 +24,15 @@ const calculatorTools = [
 export default function Home() {
   return (
     <div className="app-page home-page">
-      <SeoMeta title="Tools Thai | เครื่องมือธุรกิจไทย ใช้งานฟรี" description="Tools Thai รวมเครื่องมือสร้างเอกสารธุรกิจและคำนวณตัวเลขสำคัญสำหรับธุรกิจไทย ใช้งานฟรีและเริ่มทำงานได้ทันที" canonicalPath="/" />
+      <SeoMeta title={homeSeo.title} description={homeSeo.description} canonicalPath={homeSeo.path} />
       <PublicHeader />
       <main>
         <section className="hero shell">
           <div className="hero-copy">
             <p className="eyebrow"><span /> BUSINESS UTILITIES, MADE FOR THAI WORK</p>
-            <h1>งานเอกสารที่ดี<br /><em>เริ่มต้นได้ใน</em><br />ไม่กี่คลิก</h1>
+            <h1>สร้างเอกสารธุรกิจ<br /><em>ออนไลน์ฟรี</em><br />สำหรับธุรกิจไทย</h1>
             <p className="hero-description">
-              สร้างเอกสารธุรกิจและคำนวณตัวเลขสำคัญได้จากที่เดียว<br className="desktop-only" />
-              ใช้งานฟรี ไม่ต้องสมัคร และออกแบบมาเพื่อธุรกิจไทย
+              {homeSeo.intro}
             </p>
             <div className="hero-actions">
               <Link href="/quotation" className="button button-primary">สร้างใบเสนอราคาฟรี <ArrowRight size={18} /></Link>
