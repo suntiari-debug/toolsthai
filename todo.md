@@ -107,3 +107,6 @@
 - [x] ปรับ H1 และข้อความ Hero หน้าแรกให้สื่อ search intent ของเครื่องมือธุรกิจไทยชัดเจน
 - [x] แก้ robots.txt และ sitemap.xml ให้ใช้ canonical domain ปัจจุบัน
 - [x] เพิ่ม SSR verification สำหรับหน้าแรกและรัน TypeScript, Vitest, build, SSR, raw HTML และ hydration checks
+- [x] ตรวจ Landing Page บนเดสก์ท็อปและมือถือจากมุมมองผู้ใช้ใหม่
+- [x] ประเมิน user journey, CTA, ความชัดเจนของข้อมูล และจุดลดความลังเล
+- [x] สรุปจุดเด่น ข้อปรับปรุง และลำดับความสำคัญของ UX Landing Page
