@@ -2,6 +2,7 @@ export type PreviewZoom = -1 | 0 | 1;
 export type PreviewPan = { x: number; y: number };
 export type PreviewScrollIndicator = { section: "ส่วนบน" | "ส่วนกลาง" | "ส่วนล่าง"; progress: number };
 export type TapPoint = { x: number; y: number; timestamp: number };
+export type PreviewZoomDevice = "mobile" | "desktop";
 
 export function boundedPreviewZoom(value: number): PreviewZoom {
   if (value >= 1) return 1;
@@ -15,7 +16,15 @@ export function parseStoredPreviewZoom(value: string | null): PreviewZoom {
   return 0;
 }
 
-export function getPreviewZoomStorageKey(documentKind: string): string {
+export function getPreviewZoomDevice(viewportWidth: number): PreviewZoomDevice {
+  return viewportWidth <= 820 ? "mobile" : "desktop";
+}
+
+export function getPreviewZoomStorageKey(documentKind: string, device: PreviewZoomDevice): string {
+  return `toolsthai.preview-zoom.${documentKind}.${device}`;
+}
+
+export function getLegacyPreviewZoomStorageKey(documentKind: string): string {
   return `toolsthai.preview-zoom.${documentKind}`;
 }
 

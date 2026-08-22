@@ -12,7 +12,7 @@ import { trpc } from "@/lib/trpc";
 import SeoMeta from "@/components/SeoMeta";
 import { getDocumentSeo, getDocumentStructuredData } from "@shared/seo";
 import "../styles/document-typography.css";
-import { boundedPreviewZoom, clampPreviewPan, getPreviewScrollIndicator, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, TapPoint } from "@/lib/previewZoom";
+import { boundedPreviewZoom, clampPreviewPan, getLegacyPreviewZoomStorageKey, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
 
 type DocumentToolProps = { kind: DocumentKind };
 type DocumentTemplate = "modern" | "classic" | "minimal";
@@ -44,6 +44,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const [previewZoom, setPreviewZoom] = useState<PreviewZoom>(0);
   const [previewPan, setPreviewPan] = useState<PreviewPan>({ x: 0, y: 0 });
   const [isPreviewZoomRestored, setIsPreviewZoomRestored] = useState(false);
+  const [previewZoomDevice, setPreviewZoomDevice] = useState<PreviewZoomDevice>(() => typeof window === "undefined" ? "desktop" : getPreviewZoomDevice(window.innerWidth));
   const pinchState = useRef<{ distance: number; zoom: PreviewZoom } | null>(null);
   const panState = useRef<{ clientX: number; clientY: number; pan: PreviewPan } | null>(null);
   const singleTouchState = useRef<{ x: number; y: number; moved: boolean } | null>(null);
@@ -64,19 +65,28 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const previewZoomLabel = previewZoom === -1 ? "90%" : previewZoom === 1 ? "110%" : "100%";
   const previewHint = previewZoom === 1 ? "ลากหนึ่งนิ้วเพื่อเลื่อน · แตะสองครั้งเพื่อรีเซ็ต" : "ถ่างหรือหุบนิ้วสองนิ้วเพื่อซูม · แตะสองครั้งเพื่อรีเซ็ต";
   const previewScrollIndicator = previewZoom === 1 ? getPreviewScrollIndicator(previewPan.y, 188) : null;
-  const previewZoomStorageKey = getPreviewZoomStorageKey(kind);
+  const previewZoomStorageKey = getPreviewZoomStorageKey(kind, previewZoomDevice);
   const updatePreviewZoom = (value: number) => setPreviewZoom(boundedPreviewZoom(value));
+  useEffect(() => {
+    const syncPreviewZoomDevice = () => setPreviewZoomDevice(getPreviewZoomDevice(window.innerWidth));
+    syncPreviewZoomDevice();
+    window.addEventListener("resize", syncPreviewZoomDevice);
+    return () => window.removeEventListener("resize", syncPreviewZoomDevice);
+  }, []);
   useEffect(() => {
     setIsPreviewZoomRestored(false);
     try {
       skipPreviewZoomPersistence.current = previewZoomStorageKey;
-      setPreviewZoom(parseStoredPreviewZoom(window.localStorage.getItem(previewZoomStorageKey)));
+      const storedZoom = window.localStorage.getItem(previewZoomStorageKey);
+      const legacyZoom = storedZoom === null ? window.localStorage.getItem(getLegacyPreviewZoomStorageKey(kind)) : null;
+      if (storedZoom === null && legacyZoom !== null) window.localStorage.setItem(previewZoomStorageKey, legacyZoom);
+      setPreviewZoom(parseStoredPreviewZoom(storedZoom ?? legacyZoom));
     } catch {
       setPreviewZoom(0);
     } finally {
       setIsPreviewZoomRestored(true);
     }
-  }, [previewZoomStorageKey]);
+  }, [kind, previewZoomStorageKey]);
   useEffect(() => {
     if (!isPreviewZoomRestored) return;
     if (skipPreviewZoomPersistence.current === previewZoomStorageKey) {

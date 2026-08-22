@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boundedPreviewZoom, clampPreviewPan, getPreviewScrollIndicator, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep } from "./previewZoom";
+import { boundedPreviewZoom, clampPreviewPan, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep } from "./previewZoom";
 
 describe("preview zoom controls", () => {
   it("limits all requested levels to the supported range", () => {
@@ -15,10 +15,13 @@ describe("preview zoom controls", () => {
     expect(parseStoredPreviewZoom(null)).toBe(0);
   });
 
-  it("uses a distinct storage key for each document type", () => {
-    expect(getPreviewZoomStorageKey("quotation")).toBe("toolsthai.preview-zoom.quotation");
-    expect(getPreviewZoomStorageKey("invoice")).toBe("toolsthai.preview-zoom.invoice");
-    expect(getPreviewZoomStorageKey("quotation")).not.toBe(getPreviewZoomStorageKey("invoice"));
+  it("uses distinct storage keys for each document type and device class", () => {
+    expect(getPreviewZoomStorageKey("quotation", "mobile")).toBe("toolsthai.preview-zoom.quotation.mobile");
+    expect(getPreviewZoomStorageKey("quotation", "desktop")).toBe("toolsthai.preview-zoom.quotation.desktop");
+    expect(getPreviewZoomStorageKey("quotation", "mobile")).not.toBe(getPreviewZoomStorageKey("invoice", "mobile"));
+    expect(getPreviewZoomStorageKey("quotation", "mobile")).not.toBe(getPreviewZoomStorageKey("quotation", "desktop"));
+    expect(getPreviewZoomDevice(820)).toBe("mobile");
+    expect(getPreviewZoomDevice(821)).toBe("desktop");
   });
 
   it("turns a pinch out gesture into one larger zoom level", () => {
