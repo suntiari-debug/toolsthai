@@ -3,6 +3,7 @@ export type PreviewPan = { x: number; y: number };
 export type PreviewScrollIndicator = { section: "ส่วนบน" | "ส่วนกลาง" | "ส่วนล่าง"; progress: number };
 export type TapPoint = { x: number; y: number; timestamp: number };
 export type PreviewZoomDevice = "mobile" | "desktop";
+export const previewZoomDocumentKinds = ["quotation", "invoice", "receipt", "delivery-note", "tax-invoice"] as const;
 
 export function boundedPreviewZoom(value: number): PreviewZoom {
   if (value >= 1) return 1;
@@ -22,6 +23,10 @@ export function getPreviewZoomDevice(viewportWidth: number): PreviewZoomDevice {
 
 export function getPreviewZoomStorageKey(documentKind: string, device: PreviewZoomDevice): string {
   return `toolsthai.preview-zoom.${documentKind}.${device}`;
+}
+
+export function getAllPreviewZoomStorageKeys(device: PreviewZoomDevice): string[] {
+  return previewZoomDocumentKinds.map((documentKind) => getPreviewZoomStorageKey(documentKind, device));
 }
 
 export function getLegacyPreviewZoomStorageKey(documentKind: string): string {

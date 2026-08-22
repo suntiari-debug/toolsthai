@@ -185,8 +185,51 @@ try {
   }
   await page.reload({ waitUntil: "networkidle" });
   if (await page.locator(".preview-zoom-controls output").textContent() !== "100%") throw new Error("Mobile quotation did not use default zoom after clearing its preference");
+  await page.locator('button[aria-label="ซูมเข้า"]').evaluate((button) => button.click());
+  await page.waitForTimeout(80);
+  if (await page.locator(".preview-zoom-controls output").textContent() !== "110%") throw new Error("Quotation zoom was not restored before testing all-document reset");
+  await page.goto("http://127.0.0.1:3000/invoice", { waitUntil: "networkidle" });
+  if (await page.locator(".preview-zoom-controls output").textContent() !== "90%") throw new Error("Invoice preference was unexpectedly lost before all-document reset");
+  await page.locator('button[aria-label="ซูมเข้า"]').evaluate((button) => button.click());
+  await page.locator('button[aria-label="ซูมเข้า"]').evaluate((button) => button.click());
+  await page.waitForTimeout(80);
+  if (await page.locator(".preview-zoom-controls output").textContent() !== "110%") throw new Error("Invoice zoom was not updated before all-document reset");
+  await page.goto("http://127.0.0.1:3000/receipt", { waitUntil: "networkidle" });
+  await page.locator('button[aria-label="ซูมออก"]').evaluate((button) => button.click());
+  await page.waitForTimeout(80);
+  if (await page.locator(".preview-zoom-controls output").textContent() !== "90%") throw new Error("Receipt zoom was not updated before all-document reset");
+  await page.goto("http://127.0.0.1:3000/quotation", { waitUntil: "networkidle" });
+  const allResetTrigger = page.locator('button[aria-label="ล้างค่าซูมทุกเอกสารบนอุปกรณ์นี้"]');
+  await allResetTrigger.evaluate((button) => button.click());
+  const allConfirmDialog = page.locator('[data-slot="alert-dialog-content"]');
+  await allConfirmDialog.waitFor();
+  if (!(await allConfirmDialog.textContent())?.includes("ล้างค่าซูมทุกเอกสาร?")) throw new Error("All-document zoom reset dialog did not describe the action");
+  await allConfirmDialog.getByRole("button", { name: "ยกเลิก" }).click();
+  await page.waitForTimeout(80);
+  if (await page.locator(".preview-zoom-controls output").textContent() !== "110%") throw new Error("Cancelling all-document reset incorrectly changed quotation zoom");
+  const mobilePreferencesBeforeReset = await page.evaluate(() => [
+    window.localStorage.getItem("toolsthai.preview-zoom.quotation.mobile"),
+    window.localStorage.getItem("toolsthai.preview-zoom.invoice.mobile"),
+    window.localStorage.getItem("toolsthai.preview-zoom.receipt.mobile"),
+  ]);
+  if (JSON.stringify(mobilePreferencesBeforeReset) !== JSON.stringify(["1", "1", "-1"])) throw new Error("Cancelling all-document reset incorrectly changed stored mobile preferences");
+  await allResetTrigger.evaluate((button) => button.click());
+  await allConfirmDialog.waitFor();
+  await allConfirmDialog.getByRole("button", { name: "ล้างทุกเอกสาร", exact: true }).click();
+  await page.waitForTimeout(80);
+  if (await page.locator(".preview-zoom-controls output").textContent() !== "100%") throw new Error("All-document reset did not return the current preview to 100%");
+  const mobilePreferencesAfterReset = await page.evaluate(() => [
+    window.localStorage.getItem("toolsthai.preview-zoom.quotation.mobile"),
+    window.localStorage.getItem("toolsthai.preview-zoom.invoice.mobile"),
+    window.localStorage.getItem("toolsthai.preview-zoom.receipt.mobile"),
+  ]);
+  if (!mobilePreferencesAfterReset.every((value) => value === null)) throw new Error("All-document reset did not remove all mobile preferences");
+  await page.goto("http://127.0.0.1:3000/invoice", { waitUntil: "networkidle" });
+  if (await page.locator(".preview-zoom-controls output").textContent() !== "100%") throw new Error("Invoice did not use default zoom after all-document reset");
+  await page.goto("http://127.0.0.1:3000/receipt", { waitUntil: "networkidle" });
+  if (await page.locator(".preview-zoom-controls output").textContent() !== "100%") throw new Error("Receipt did not use default zoom after all-document reset");
   if (await desktopPage.locator(".preview-zoom-controls output").textContent() !== "90%") {
-    throw new Error("Current device reset incorrectly changed the desktop quotation zoom preference");
+    throw new Error("All-document mobile reset incorrectly changed the desktop quotation zoom preference");
   }
   await desktopContext.close();
 

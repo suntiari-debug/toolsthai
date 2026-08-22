@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boundedPreviewZoom, clampPreviewPan, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep } from "./previewZoom";
+import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep } from "./previewZoom";
 
 describe("preview zoom controls", () => {
   it("limits all requested levels to the supported range", () => {
@@ -22,6 +22,17 @@ describe("preview zoom controls", () => {
     expect(getPreviewZoomStorageKey("quotation", "mobile")).not.toBe(getPreviewZoomStorageKey("quotation", "desktop"));
     expect(getPreviewZoomDevice(820)).toBe("mobile");
     expect(getPreviewZoomDevice(821)).toBe("desktop");
+  });
+
+  it("lists only the current device keys when clearing all document preferences", () => {
+    expect(getAllPreviewZoomStorageKeys("mobile")).toEqual([
+      "toolsthai.preview-zoom.quotation.mobile",
+      "toolsthai.preview-zoom.invoice.mobile",
+      "toolsthai.preview-zoom.receipt.mobile",
+      "toolsthai.preview-zoom.delivery-note.mobile",
+      "toolsthai.preview-zoom.tax-invoice.mobile",
+    ]);
+    expect(getAllPreviewZoomStorageKeys("desktop")).not.toContain("toolsthai.preview-zoom.invoice.mobile");
   });
 
   it("turns a pinch out gesture into one larger zoom level", () => {
