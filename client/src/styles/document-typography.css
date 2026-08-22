@@ -309,15 +309,62 @@
 }
 
 .preview-zoom-controls output {
-  display: grid;
-  width: 2.65rem;
+  display: inline-flex;
+  width: 4.35rem;
   height: 1.75rem;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
+  gap: .22rem;
   color: #3d514e;
-  background: #fff;
+  background: #f4faf8;
   font-family: "DM Sans", "Sarabun", sans-serif;
-  font-size: .69rem;
+  font-size: .63rem;
   font-weight: 700;
+  letter-spacing: .01em;
+}
+
+.preview-zoom-controls output::before {
+  color: #5c7772;
+  content: "ซูม";
+  font-weight: 600;
+}
+
+.preview-zoom-controls output {
+  color: #0d6e72;
+  font-size: .73rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .preview-toolbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: .45rem;
+  }
+
+  .preview-toolbar-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 540px) {
+  .preview-toolbar-actions > .zoom-storage-reset-button,
+  .preview-toolbar-actions > .zoom-storage-reset-all-button {
+    display: grid;
+    width: 1.85rem;
+    height: 1.75rem;
+    place-items: center;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .preview-toolbar-actions > .zoom-storage-reset-button svg,
+  .preview-toolbar-actions > .zoom-storage-reset-all-button svg {
+    width: .9rem;
+    height: .9rem;
+  }
 }
 
 .preview-zoom-controls .zoom-reset-button {
