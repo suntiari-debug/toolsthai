@@ -100,6 +100,16 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     }
   }, [isPreviewZoomRestored, previewZoom, previewZoomStorageKey]);
   const resetPreviewView = () => { setPreviewZoom(0); setPreviewPan({ x: 0, y: 0 }); };
+  const resetSavedPreviewZoom = () => {
+    try {
+      skipPreviewZoomPersistence.current = previewZoomStorageKey;
+      window.localStorage.removeItem(previewZoomStorageKey);
+    } catch {
+      // Resetting the current view still works if browser storage is blocked.
+    }
+    resetPreviewView();
+    flashNotice(`รีเซ็ตค่าซูมที่จำไว้ของ${meta.title}บน${previewZoomDevice === "mobile" ? "มือถือ" : "คอมพิวเตอร์"}แล้ว`);
+  };
   useEffect(() => { if (previewZoom !== 1) setPreviewPan({ x: 0, y: 0 }); }, [previewZoom]);
   const handlePreviewTouchStart = (event: TouchEvent<HTMLDivElement>) => {
     if (event.touches.length === 2) {
@@ -310,7 +320,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
           </section>
 
           <aside className="document-preview-column">
-            <div className="preview-toolbar print-hide"><span><Info size={15} /> ตัวอย่างเอกสาร</span><div className="preview-toolbar-actions"><div className="preview-zoom-controls" role="group" aria-label="ปรับขนาดตัวอย่างเอกสาร"><button type="button" onClick={() => updatePreviewZoom(previewZoom - 1)} disabled={previewZoom === -1} aria-label="ซูมออก" title="ซูมออก"><ZoomOut size={15} /></button><output aria-live="polite" aria-label={`ขนาดตัวอย่าง ${previewZoomLabel}`}>{previewZoomLabel}</output><button type="button" onClick={() => updatePreviewZoom(previewZoom + 1)} disabled={previewZoom === 1} aria-label="ซูมเข้า" title="ซูมเข้า"><ZoomIn size={15} /></button><button type="button" className="zoom-reset-button" onClick={() => setPreviewZoom(0)} disabled={previewZoom === 0} aria-label="รีเซ็ตขนาดตัวอย่าง" title="รีเซ็ตขนาด"><RotateCcw size={14} /></button></div><button type="button" onClick={handlePdfExport} disabled={isExporting}><Download size={15} /> {isExporting ? "กำลังสร้าง" : "PDF"}</button></div></div>
+            <div className="preview-toolbar print-hide"><span><Info size={15} /> ตัวอย่างเอกสาร</span><div className="preview-toolbar-actions"><div className="preview-zoom-controls" role="group" aria-label="ปรับขนาดตัวอย่างเอกสาร"><button type="button" onClick={() => updatePreviewZoom(previewZoom - 1)} disabled={previewZoom === -1} aria-label="ซูมออก" title="ซูมออก"><ZoomOut size={15} /></button><output aria-live="polite" aria-label={`ขนาดตัวอย่าง ${previewZoomLabel}`}>{previewZoomLabel}</output><button type="button" onClick={() => updatePreviewZoom(previewZoom + 1)} disabled={previewZoom === 1} aria-label="ซูมเข้า" title="ซูมเข้า"><ZoomIn size={15} /></button><button type="button" className="zoom-reset-button" onClick={() => setPreviewZoom(0)} disabled={previewZoom === 0} aria-label="รีเซ็ตขนาดตัวอย่าง" title="รีเซ็ตขนาด"><RotateCcw size={14} /></button></div><button type="button" className="zoom-storage-reset-button" onClick={resetSavedPreviewZoom} aria-label="ล้างค่าซูมที่จำไว้สำหรับอุปกรณ์นี้" title="ล้างค่าซูมที่จำไว้"><RotateCcw size={14} /> ล้างค่าซูม</button><button type="button" onClick={handlePdfExport} disabled={isExporting}><Download size={15} /> {isExporting ? "กำลังสร้าง" : "PDF"}</button></div></div>
             <div className={`preview-paper-wrap ${previewZoom === 1 ? "preview-pan-enabled" : ""}`} tabIndex={0} aria-label="ตัวอย่างเอกสาร รองรับการถ่างหรือหุบนิ้วเพื่อซูมบนมือถือ" onTouchStart={handlePreviewTouchStart} onTouchMove={handlePreviewTouchMove} onTouchEnd={handlePreviewTouchEnd} onTouchCancel={clearPreviewTouch}>{previewScrollIndicator && <div className="document-scroll-indicator print-hide" aria-live="polite"><span>กำลังดู</span><strong>{previewScrollIndicator.section}</strong><div className="scroll-indicator-track" aria-hidden="true"><i style={{ left: `${previewScrollIndicator.progress}%` }} /></div></div>}<span className="pinch-zoom-hint print-hide">{previewHint}</span><DocumentPreview document={document} accentColor={accentColor} template={template} screenZoom={previewZoom} screenPan={previewPan} /></div>
             <div className="convert-card print-hide"><div><FilePlus2 size={20} /><span><strong>ทำเอกสารต่อเนื่อง</strong><small>นำข้อมูลชุดนี้ไปสร้างเอกสารถัดไปได้ทันที</small></span></div><div className="convert-buttons">{convertTargets[kind].map((target) => <button type="button" key={target} onClick={() => handleConvert(target)}>{documentMeta[target].title}<ArrowRight size={14} /></button>)}</div></div>
           </aside>

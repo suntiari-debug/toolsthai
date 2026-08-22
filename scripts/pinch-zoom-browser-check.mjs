@@ -160,6 +160,17 @@ try {
   if (await desktopPage.locator(".preview-zoom-controls output").textContent() !== "90%") throw new Error("Desktop quotation preview zoom was not restored");
   await page.goto("http://127.0.0.1:3000/quotation", { waitUntil: "networkidle" });
   if (await page.locator(".preview-zoom-controls output").textContent() !== "110%") throw new Error("Mobile quotation did not retain its own preview zoom after desktop update");
+  await page.locator('button[aria-label="ล้างค่าซูมที่จำไว้สำหรับอุปกรณ์นี้"]').evaluate((button) => button.click());
+  await page.waitForTimeout(80);
+  if (await page.locator(".preview-zoom-controls output").textContent() !== "100%") throw new Error("Current device reset did not return the preview to 100%");
+  if (await page.evaluate(() => window.localStorage.getItem("toolsthai.preview-zoom.quotation.mobile")) !== null) {
+    throw new Error("Current device reset did not remove the mobile quotation zoom preference");
+  }
+  await page.reload({ waitUntil: "networkidle" });
+  if (await page.locator(".preview-zoom-controls output").textContent() !== "100%") throw new Error("Mobile quotation did not use default zoom after clearing its preference");
+  if (await desktopPage.locator(".preview-zoom-controls output").textContent() !== "90%") {
+    throw new Error("Current device reset incorrectly changed the desktop quotation zoom preference");
+  }
   await desktopContext.close();
 
   const hasScroll = await wrap.evaluate((element) => element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight);
