@@ -15,6 +15,10 @@ export function parseStoredPreviewZoom(value: string | null): PreviewZoom {
   return 0;
 }
 
+export function getPreviewZoomStorageKey(documentKind: string): string {
+  return `toolsthai.preview-zoom.${documentKind}`;
+}
+
 export function pinchZoomStep(startDistance: number, currentDistance: number, startZoom: PreviewZoom): PreviewZoom {
   if (!Number.isFinite(startDistance) || !Number.isFinite(currentDistance) || startDistance <= 0 || currentDistance <= 0) return startZoom;
   const ratio = currentDistance / startDistance;

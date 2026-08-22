@@ -12,11 +12,10 @@ import { trpc } from "@/lib/trpc";
 import SeoMeta from "@/components/SeoMeta";
 import { getDocumentSeo, getDocumentStructuredData } from "@shared/seo";
 import "../styles/document-typography.css";
-import { boundedPreviewZoom, clampPreviewPan, getPreviewScrollIndicator, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, TapPoint } from "@/lib/previewZoom";
+import { boundedPreviewZoom, clampPreviewPan, getPreviewScrollIndicator, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, TapPoint } from "@/lib/previewZoom";
 
 type DocumentToolProps = { kind: DocumentKind };
 type DocumentTemplate = "modern" | "classic" | "minimal";
-const PREVIEW_ZOOM_STORAGE_KEY = "toolsthai.preview-zoom";
 
 const convertTargets: Record<DocumentKind, DocumentKind[]> = {
   quotation: ["invoice", "receipt", "delivery-note"],
@@ -49,6 +48,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const panState = useRef<{ clientX: number; clientY: number; pan: PreviewPan } | null>(null);
   const singleTouchState = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const lastTap = useRef<TapPoint | null>(null);
+  const skipPreviewZoomPersistence = useRef<string | null>(null);
   const profileQuery = trpc.companyProfile.get.useQuery(undefined, { enabled: isAuthenticated });
   const flashNotice = (message: string) => {
     setNotice(message);
@@ -64,24 +64,31 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const previewZoomLabel = previewZoom === -1 ? "90%" : previewZoom === 1 ? "110%" : "100%";
   const previewHint = previewZoom === 1 ? "ลากหนึ่งนิ้วเพื่อเลื่อน · แตะสองครั้งเพื่อรีเซ็ต" : "ถ่างหรือหุบนิ้วสองนิ้วเพื่อซูม · แตะสองครั้งเพื่อรีเซ็ต";
   const previewScrollIndicator = previewZoom === 1 ? getPreviewScrollIndicator(previewPan.y, 188) : null;
+  const previewZoomStorageKey = getPreviewZoomStorageKey(kind);
   const updatePreviewZoom = (value: number) => setPreviewZoom(boundedPreviewZoom(value));
   useEffect(() => {
+    setIsPreviewZoomRestored(false);
     try {
-      setPreviewZoom(parseStoredPreviewZoom(window.localStorage.getItem(PREVIEW_ZOOM_STORAGE_KEY)));
+      skipPreviewZoomPersistence.current = previewZoomStorageKey;
+      setPreviewZoom(parseStoredPreviewZoom(window.localStorage.getItem(previewZoomStorageKey)));
     } catch {
       setPreviewZoom(0);
     } finally {
       setIsPreviewZoomRestored(true);
     }
-  }, []);
+  }, [previewZoomStorageKey]);
   useEffect(() => {
     if (!isPreviewZoomRestored) return;
+    if (skipPreviewZoomPersistence.current === previewZoomStorageKey) {
+      skipPreviewZoomPersistence.current = null;
+      return;
+    }
     try {
-      window.localStorage.setItem(PREVIEW_ZOOM_STORAGE_KEY, String(previewZoom));
+      window.localStorage.setItem(previewZoomStorageKey, String(previewZoom));
     } catch {
       // The preview remains usable if browser storage is blocked.
     }
-  }, [isPreviewZoomRestored, previewZoom]);
+  }, [isPreviewZoomRestored, previewZoom, previewZoomStorageKey]);
   const resetPreviewView = () => { setPreviewZoom(0); setPreviewPan({ x: 0, y: 0 }); };
   useEffect(() => { if (previewZoom !== 1) setPreviewPan({ x: 0, y: 0 }); }, [previewZoom]);
   const handlePreviewTouchStart = (event: TouchEvent<HTMLDivElement>) => {

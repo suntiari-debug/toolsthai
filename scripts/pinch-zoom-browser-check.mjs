@@ -119,12 +119,30 @@ try {
   await page.locator('button[aria-label="ซูมเข้า"]').evaluate((button) => button.click());
   await page.waitForTimeout(80);
   if (await zoomOutput.textContent() !== "110%") throw new Error("Zoom control did not update the current preview before persistence check");
-  if (await page.evaluate(() => window.localStorage.getItem("toolsthai.preview-zoom")) !== "1") {
-    throw new Error("Current preview zoom was not stored in the device");
+  if (await page.evaluate(() => window.localStorage.getItem("toolsthai.preview-zoom.quotation")) !== "1") {
+    throw new Error("Quotation preview zoom was not stored under its own key");
   }
   await page.reload({ waitUntil: "networkidle" });
   if (await page.locator(".preview-zoom-controls output").textContent() !== "110%") {
-    throw new Error("Stored preview zoom was not restored after opening the document again");
+    throw new Error("Stored quotation preview zoom was not restored after opening the document again");
+  }
+
+  await page.goto("http://127.0.0.1:3000/invoice", { waitUntil: "networkidle" });
+  const invoiceZoomOutput = page.locator(".preview-zoom-controls output");
+  if (await invoiceZoomOutput.textContent() !== "100%") throw new Error("Invoice incorrectly inherited quotation preview zoom");
+  await page.locator('button[aria-label="ซูมออก"]').evaluate((button) => button.click());
+  await page.waitForTimeout(80);
+  if (await invoiceZoomOutput.textContent() !== "90%") throw new Error("Invoice zoom control did not update the current preview");
+  if (await page.evaluate(() => window.localStorage.getItem("toolsthai.preview-zoom.invoice")) !== "-1") {
+    throw new Error("Invoice preview zoom was not stored under its own key");
+  }
+  await page.goto("http://127.0.0.1:3000/quotation", { waitUntil: "networkidle" });
+  if (await page.locator(".preview-zoom-controls output").textContent() !== "110%") {
+    throw new Error("Quotation did not retain its own preview zoom after opening invoice");
+  }
+  await page.goto("http://127.0.0.1:3000/invoice", { waitUntil: "networkidle" });
+  if (await page.locator(".preview-zoom-controls output").textContent() !== "90%") {
+    throw new Error("Invoice did not restore its own preview zoom after returning to the page");
   }
 
   const hasScroll = await wrap.evaluate((element) => element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight);
