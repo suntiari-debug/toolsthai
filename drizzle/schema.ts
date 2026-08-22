@@ -23,6 +23,8 @@ export const companyProfiles = mysqlTable("company_profiles", {
   logoUrl: text("logoUrl"),
   signatureUrl: text("signatureUrl"),
   stampUrl: text("stampUrl"),
+  signerName: varchar("signerName", { length: 255 }),
+  signerPosition: varchar("signerPosition", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

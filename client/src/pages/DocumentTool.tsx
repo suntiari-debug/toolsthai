@@ -273,7 +273,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const applySavedCompany = () => {
     const profile = profileQuery.data;
     if (!profile) return;
-    setDocument((current) => ({ ...current, company: { name: profile.name, address: profile.address || "", taxId: profile.taxId || "", phone: profile.phone || "", email: profile.email || "", logoUrl: profile.logoUrl || "" }, signatureUrl: profile.signatureUrl || "", stampUrl: profile.stampUrl || "" }));
+    setDocument((current) => ({ ...current, company: { name: profile.name, address: profile.address || "", taxId: profile.taxId || "", phone: profile.phone || "", email: profile.email || "", logoUrl: profile.logoUrl || "" }, signerName: profile.signerName || "", signerPosition: profile.signerPosition || "", signatureUrl: profile.signatureUrl || "", stampUrl: profile.stampUrl || "" }));
   };
   const handleAccountSave = () => {
     if (!isAuthenticated) { startLogin(); return; }
@@ -352,7 +352,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
 
             <section className="form-section">
               <CardHeading title="อื่นๆ" />
-              <div className="field-grid"><FormField label="หมายเหตุ"><textarea rows={3} value={document.note} onChange={(event) => updateDocument("note", event.target.value)} /></FormField><FormField label="ชื่อผู้มีอำนาจลงนาม"><input value={document.signerName || ""} onChange={(event) => updateDocument("signerName", event.target.value)} /></FormField></div>
+              <div className="field-grid"><FormField label="หมายเหตุ"><textarea rows={3} value={document.note} onChange={(event) => updateDocument("note", event.target.value)} /></FormField><div className="field-grid two-columns"><FormField label="ชื่อผู้มีอำนาจลงนาม"><input value={document.signerName || ""} onChange={(event) => updateDocument("signerName", event.target.value)} /></FormField><FormField label="ตำแหน่งผู้ลงนาม"><input value={document.signerPosition || ""} onChange={(event) => updateDocument("signerPosition", event.target.value)} placeholder="เช่น กรรมการผู้จัดการ" /></FormField></div></div>
               <label className="watermark-toggle"><input type="checkbox" checked={document.watermark} onChange={(event) => updateDocument("watermark", event.target.checked)} /><span /><div><strong>ใส่ลายน้ำ Tools Thai</strong><small>เพิ่มลายน้ำแบบโปร่งใสในเอกสาร</small></div></label>
               <button type="button" className="draft-link" onClick={handleDraft}>บันทึกฉบับร่างไว้ในอุปกรณ์นี้</button>
             </section>

@@ -49,6 +49,8 @@ describe("document calculations", () => {
     quotation.customer.name = "ลูกค้าทดสอบ";
     quotation.signatureUrl = "/manus-storage/company-signatures/signature.png";
     quotation.stampUrl = "/manus-storage/company-stamps/stamp.png";
+    quotation.signerName = "นางสาวมานี มีงานทำ";
+    quotation.signerPosition = "กรรมการผู้จัดการ";
     quotation.stampPosition = { x: 60, y: 44 };
     quotation.stampScale = 1.35;
     quotation.items = [{ id: "item-1", name: "บริการออกแบบ", description: "งานเดือนสิงหาคม", quantity: 2, unit: "ชั่วโมง", unitPrice: 1500 }];
@@ -67,6 +69,8 @@ describe("document calculations", () => {
       expect(converted.items).not.toBe(quotation.items);
       expect(converted.signatureUrl).toBe(quotation.signatureUrl);
       expect(converted.stampUrl).toBe(quotation.stampUrl);
+      expect(converted.signerName).toBe("นางสาวมานี มีงานทำ");
+      expect(converted.signerPosition).toBe("กรรมการผู้จัดการ");
       expect(converted.stampPosition).toEqual({ x: 60, y: 44 });
       expect(converted.stampScale).toBe(1.35);
     }
@@ -78,6 +82,8 @@ describe("document calculations", () => {
     quotation.customer.name = "ลูกค้าทดสอบ";
     quotation.signatureUrl = "/manus-storage/company-signatures/signature.png";
     quotation.stampUrl = "/manus-storage/company-stamps/stamp.png";
+    quotation.signerName = "นางสาวมานี มีงานทำ";
+    quotation.signerPosition = "กรรมการผู้จัดการ";
     quotation.stampPosition = { x: 60, y: 44 };
     quotation.stampScale = 1.35;
     quotation.items = [{ id: "item-2", name: "บริการรายเดือน", description: "สิงหาคม", quantity: 1, unit: "เดือน", unitPrice: 2500 }];
@@ -87,6 +93,8 @@ describe("document calculations", () => {
     expect(restored.documentNumber).toMatch(/^RC-/);
     expect(restored.signatureUrl).toBe("/manus-storage/company-signatures/signature.png");
     expect(restored.stampUrl).toBe("/manus-storage/company-stamps/stamp.png");
+    expect(restored.signerName).toBe("นางสาวมานี มีงานทำ");
+    expect(restored.signerPosition).toBe("กรรมการผู้จัดการ");
     expect(restored.stampPosition).toEqual({ x: 60, y: 44 });
     expect(restored.stampScale).toBe(1.35);
   });

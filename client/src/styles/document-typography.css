@@ -173,6 +173,14 @@
   font-size: .76rem;
 }
 
+.document-tool-page .pdf-signer-position {
+  display: block;
+  margin-top: -.16rem;
+  color: #71807d;
+  font-size: .68rem;
+  font-style: normal;
+}
+
 .document-tool-page .pdf-signatures .pdf-signature-recipient,
 .document-tool-page .pdf-signatures .pdf-signature-company {
   display: grid;

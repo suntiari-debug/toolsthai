@@ -19,6 +19,8 @@ const companyProfileInput = z.object({
   existingSignatureUrl: z.string().max(1024).optional(),
   stampDataUrl: z.string().max(750_000).optional(),
   existingStampUrl: z.string().max(1024).optional(),
+  signerName: z.string().trim().max(255).optional(),
+  signerPosition: z.string().trim().max(255).optional(),
 });
 
 function getImageUpload(imageDataUrl: string, label: string) {
@@ -62,7 +64,7 @@ export const appRouter = router({
         const result = await storagePut(`company-stamps/${ctx.user.id}/${Date.now()}.${upload.extension}`, upload.buffer, upload.mimeType);
         stampUrl = result.url;
       }
-      return db.saveCompanyProfile({ userId: ctx.user.id, name: input.name, address: input.address || null, taxId: input.taxId || null, phone: input.phone || null, email: input.email || null, logoUrl, signatureUrl, stampUrl });
+      return db.saveCompanyProfile({ userId: ctx.user.id, name: input.name, address: input.address || null, taxId: input.taxId || null, phone: input.phone || null, email: input.email || null, logoUrl, signatureUrl, stampUrl, signerName: input.signerName || null, signerPosition: input.signerPosition || null });
     }),
   }),
   documents: router({

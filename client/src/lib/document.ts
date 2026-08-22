@@ -46,6 +46,7 @@ export type BusinessDocument = {
   vatMode: "excluded" | "included" | "none";
   note: string;
   signerName?: string;
+  signerPosition?: string;
   signatureUrl?: string;
   stampUrl?: string;
   stampPosition?: StampPosition;
@@ -95,6 +96,7 @@ export function createInitialDocument(kind: DocumentKind): BusinessDocument {
     vatMode: "excluded",
     note: "ขอบพระคุณที่ไว้วางใจใช้บริการ",
     signerName: "",
+    signerPosition: "",
     signatureUrl: "",
     stampUrl: "",
     stampPosition: { ...defaultStampPosition },
@@ -120,6 +122,7 @@ export function restoreDocument(payload: string, activeKind: DocumentKind): Busi
     ...document,
     kind: activeKind,
     signerName: document.signerName || "",
+    signerPosition: document.signerPosition || "",
     signatureUrl: document.signatureUrl || "",
     stampUrl: document.stampUrl || "",
     stampPosition: boundedStampPosition(document.stampPosition || defaultStampPosition),
