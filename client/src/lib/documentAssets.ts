@@ -1,6 +1,10 @@
 export const MAX_DOCUMENT_ASSET_BYTES = 500_000;
 const ALLOWED_DOCUMENT_ASSET_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
+export function isTemporaryDocumentAssetUrl(url: string | undefined) {
+  return Boolean(url?.startsWith("blob:"));
+}
+
 export function validateDocumentAssetFile(file: Pick<File, "type" | "size"> | undefined, label: string) {
   if (!file) return { valid: false as const, message: "กรุณาเลือกไฟล์ภาพ" };
   if (!ALLOWED_DOCUMENT_ASSET_TYPES.has(file.type)) return { valid: false as const, message: `${label}รองรับเฉพาะ PNG, JPG และ WEBP` };

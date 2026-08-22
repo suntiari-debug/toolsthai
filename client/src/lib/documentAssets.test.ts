@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_DOCUMENT_ASSET_BYTES, validateDocumentAssetFile } from "./documentAssets";
+import { isTemporaryDocumentAssetUrl, MAX_DOCUMENT_ASSET_BYTES, validateDocumentAssetFile } from "./documentAssets";
 
 describe("document asset validation", () => {
   it("accepts a PNG, JPG, or WEBP image no larger than 500 KB", () => {
@@ -11,5 +11,12 @@ describe("document asset validation", () => {
   it("rejects unsupported image types and oversized files", () => {
     expect(validateDocumentAssetFile({ type: "image/gif", size: 1 }, "ลายเซ็น")).toEqual({ valid: false, message: "ลายเซ็นรองรับเฉพาะ PNG, JPG และ WEBP" });
     expect(validateDocumentAssetFile({ type: "image/png", size: MAX_DOCUMENT_ASSET_BYTES + 1 }, "ตรายาง")).toEqual({ valid: false, message: "ไฟล์ตรายางต้องมีขนาดไม่เกิน 500 KB" });
+  });
+
+  it("identifies only browser-generated object URLs as temporary assets", () => {
+    expect(isTemporaryDocumentAssetUrl("blob:https://toolsthai.test/logo-1")).toBe(true);
+    expect(isTemporaryDocumentAssetUrl("https://cdn.example.com/logo.png")).toBe(false);
+    expect(isTemporaryDocumentAssetUrl("")).toBe(false);
+    expect(isTemporaryDocumentAssetUrl(undefined)).toBe(false);
   });
 });

@@ -12,7 +12,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import SeoMeta from "@/components/SeoMeta";
 import { getDocumentSeo, getDocumentStructuredData } from "@shared/seo";
-import { validateDocumentAssetFile } from "@/lib/documentAssets";
+import { isTemporaryDocumentAssetUrl, validateDocumentAssetFile } from "@/lib/documentAssets";
 import { getItemPreviewHighlightTarget, getPreviewHighlightTarget, type PreviewHighlightTarget } from "@/lib/previewHighlight";
 import "../styles/document-typography.css";
 import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollBehavior, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
@@ -216,7 +216,14 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const handleLogo = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !file.type.startsWith("image/")) return;
+    if (isTemporaryDocumentAssetUrl(document.company.logoUrl)) URL.revokeObjectURL(document.company.logoUrl);
     updateParty("company", "logoUrl", URL.createObjectURL(file));
+    event.target.value = "";
+  };
+  const removeLogo = () => {
+    if (isTemporaryDocumentAssetUrl(document.company.logoUrl)) URL.revokeObjectURL(document.company.logoUrl);
+    updateParty("company", "logoUrl", "");
+    flashNotice("ลบโลโก้ออกจากเอกสารนี้แล้ว");
   };
   const handleDocumentAsset = (event: ChangeEvent<HTMLInputElement>, field: "signatureUrl" | "stampUrl", label: string) => {
     const file = event.target.files?.[0];
@@ -328,7 +335,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
               <p className="design-label">สีหลัก</p>
               <div className="accent-picker" aria-label="เลือกสีหลักของเอกสาร">{accentChoices.map((color) => <button type="button" key={color} className={accentColor === color ? "is-selected" : ""} data-preview-highlight="document" onClick={() => setAccentColor(color)} style={{ backgroundColor: color }} aria-label={`เลือกสี ${color}`} />)}</div>
               <div className="document-assets-row">
-                <label className="asset-upload-tile" data-preview-highlight="company"><span className="asset-preview">{document.company.logoUrl ? <img src={document.company.logoUrl} alt="ตัวอย่างโลโก้" /> : <WandSparkles size={18} />}</span><strong>โลโก้</strong><span><Upload size={13} /> อัปโหลด</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogo} /></label>
+                <div className="asset-upload-tile" data-preview-highlight="company"><span className="asset-preview">{document.company.logoUrl ? <img src={document.company.logoUrl} alt="ตัวอย่างโลโก้" /> : <WandSparkles size={18} />}</span><strong>โลโก้</strong><label className="asset-upload-action"><Upload size={13} /> {document.company.logoUrl ? "เปลี่ยนรูป" : "อัปโหลด"}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogo} /></label>{document.company.logoUrl && <button type="button" className="asset-remove-button" onClick={removeLogo}>ลบรูป</button>}</div>
                 <DocumentAssetTile label="ลายเซ็น" previewUrl={document.signatureUrl || ""} previewHighlight="signature" onChange={(event) => handleDocumentAsset(event, "signatureUrl", "ลายเซ็น")} onRemove={() => removeDocumentAsset("signatureUrl", "ลายเซ็น")} />
                 <DocumentAssetTile label="ตรายาง" previewUrl={document.stampUrl || ""} previewHighlight="signature" onChange={(event) => handleDocumentAsset(event, "stampUrl", "ตรายาง")} onRemove={() => removeDocumentAsset("stampUrl", "ตรายาง")} />
               </div>
