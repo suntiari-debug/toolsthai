@@ -1,6 +1,6 @@
 import { ChangeEvent, type CSSProperties, TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, ArrowRight, Download, Eye, EyeOff, FileDown, FilePlus2, Info, Plus, Printer, RotateCcw, Save, ShieldCheck, Trash2, Undo2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Eye, EyeOff, FileDown, FilePlus2, Info, Plus, Printer, RotateCcw, Save, Search, ShieldCheck, Tags, Trash2, Undo2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
 import PublicFooter from "@/components/PublicFooter";
 import PublicHeader from "@/components/PublicHeader";
 import DocumentPreview from "@/components/DocumentPreview";
@@ -15,7 +15,7 @@ import SeoMeta from "@/components/SeoMeta";
 import { getDocumentSeo, getDocumentStructuredData } from "@shared/seo";
 import { isTemporaryDocumentAssetUrl, readDocumentAssetAsDataUrl, validateDocumentAssetFile } from "@/lib/documentAssets";
 import { getDocumentValidationIssues } from "@/lib/documentValidation";
-import { LOGO_PRESETS_STORAGE_KEY, MAX_LOGO_PRESETS, parseStoredPreviewHighlight, PREVIEW_HIGHLIGHT_PREFERENCE_STORAGE_KEY, sanitizeLogoPresets, serializeLogoPresets, type LogoPreset } from "@/lib/documentPreferences";
+import { createLogoPresetExport, filterLogoPresets, LEGACY_LOGO_PRESETS_STORAGE_KEY, LOGO_PRESETS_STORAGE_KEY, logoPresetCategories, MAX_LOGO_PRESET_IMPORT_BYTES, MAX_LOGO_PRESETS, mergeLogoPresets, parseLogoPresetImport, parseStoredPreviewHighlight, PREVIEW_HIGHLIGHT_PREFERENCE_STORAGE_KEY, sanitizeLogoPresets, serializeLogoPresets, type LogoPreset, type LogoPresetCategory } from "@/lib/documentPreferences";
 import { getItemPreviewHighlightTarget, getPreviewHighlightTarget, type PreviewHighlightTarget } from "@/lib/previewHighlight";
 import "../styles/document-typography.css";
 import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollBehavior, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
@@ -62,6 +62,9 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const [lastRemovedLogo, setLastRemovedLogo] = useState<RemovedLogo | null>(null);
   const [logoPresets, setLogoPresets] = useState<LogoPreset[]>([]);
   const [logoPresetName, setLogoPresetName] = useState("");
+  const [logoPresetCategory, setLogoPresetCategory] = useState<LogoPresetCategory>("ทั่วไป");
+  const [logoPresetSearch, setLogoPresetSearch] = useState("");
+  const [logoPresetFilter, setLogoPresetFilter] = useState<LogoPresetCategory | "all">("all");
   const [isLogoPresetsRestored, setIsLogoPresetsRestored] = useState(false);
   const pinchState = useRef<{ distance: number; zoom: PreviewZoom } | null>(null);
   const panState = useRef<{ clientX: number; clientY: number; pan: PreviewPan } | null>(null);
@@ -89,6 +92,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const previewScrollIndicator = previewZoom === 1 ? getPreviewScrollIndicator(previewPan.y, 188) : null;
   const previewZoomStorageKey = getPreviewZoomStorageKey(kind, previewZoomDevice);
   const updatePreviewZoom = (value: number) => setPreviewZoom(boundedPreviewZoom(value));
+  const visibleLogoPresets = useMemo(() => filterLogoPresets(logoPresets, logoPresetSearch, logoPresetFilter), [logoPresetFilter, logoPresetSearch, logoPresets]);
   const scrollToPreview = () => {
     const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     previewColumnRef.current?.scrollIntoView({ behavior: getPreviewScrollBehavior(prefersReducedMotion), block: "start" });
@@ -118,7 +122,11 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   }, [isPreviewHighlightEnabled, isPreviewHighlightRestored]);
   useEffect(() => {
     try {
-      setLogoPresets(sanitizeLogoPresets(window.localStorage.getItem(LOGO_PRESETS_STORAGE_KEY)));
+      const current = window.localStorage.getItem(LOGO_PRESETS_STORAGE_KEY);
+      const legacy = current === null ? window.localStorage.getItem(LEGACY_LOGO_PRESETS_STORAGE_KEY) : null;
+      const restored = sanitizeLogoPresets(current ?? legacy);
+      setLogoPresets(restored);
+      if (current === null && legacy !== null && restored.length) window.localStorage.setItem(LOGO_PRESETS_STORAGE_KEY, serializeLogoPresets(restored));
     } catch {
       setLogoPresets([]);
     } finally {
@@ -301,7 +309,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const saveLogoPreset = () => {
     const name = logoPresetName.trim();
     if (!document.company.logoUrl || !name) return;
-    const preset: LogoPreset = { id: crypto.randomUUID(), name, logoUrl: document.company.logoUrl, crop: boundedLogoCrop(document.logoCrop), position: boundedLogoPosition(document.logoPosition || defaultLogoPosition), scale: boundedLogoScale(document.logoScale || defaultLogoScale) };
+    const preset: LogoPreset = { id: crypto.randomUUID(), name, logoUrl: document.company.logoUrl, crop: boundedLogoCrop(document.logoCrop), position: boundedLogoPosition(document.logoPosition || defaultLogoPosition), scale: boundedLogoScale(document.logoScale || defaultLogoScale), category: logoPresetCategory, company: { name: document.company.name, address: document.company.address, taxId: document.company.taxId, phone: document.company.phone, email: document.company.email } };
     setLogoPresets((current) => [preset, ...current.filter((item) => item.name.toLocaleLowerCase("th-TH") !== name.toLocaleLowerCase("th-TH"))].slice(0, MAX_LOGO_PRESETS));
     setLogoPresetName("");
     flashNotice(`บันทึก “${name}” เป็น preset โลโก้แล้ว`);
@@ -312,12 +320,37 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
       return null;
     });
     if (isTemporaryDocumentAssetUrl(document.company.logoUrl)) URL.revokeObjectURL(document.company.logoUrl);
-    setDocument((current) => ({ ...current, company: { ...current.company, logoUrl: preset.logoUrl }, logoCrop: preset.crop, logoPosition: preset.position, logoScale: preset.scale }));
-    flashNotice(`ใช้โลโก้ “${preset.name}” แล้ว`);
+    setDocument((current) => ({ ...current, company: { ...current.company, name: preset.company.name || current.company.name, address: preset.company.address || current.company.address, taxId: preset.company.taxId || current.company.taxId, phone: preset.company.phone || current.company.phone, email: preset.company.email || current.company.email, logoUrl: preset.logoUrl }, logoCrop: preset.crop, logoPosition: preset.position, logoScale: preset.scale }));
+    flashNotice(`ใช้แบรนด์ “${preset.name}” พร้อมข้อมูลบริษัทแล้ว`);
   };
   const removeLogoPreset = (presetId: string) => {
     setLogoPresets((current) => current.filter((preset) => preset.id !== presetId));
     flashNotice("ลบ preset โลโก้ออกจากอุปกรณ์นี้แล้ว");
+  };
+  const exportLogoPresets = () => {
+    const payload = JSON.stringify(createLogoPresetExport(logoPresets), null, 2);
+    const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
+    const link = window.document.createElement("a");
+    link.href = url;
+    link.download = "tools-thai-logo-presets.json";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    flashNotice("ส่งออก preset โลโก้เป็นไฟล์แล้ว");
+  };
+  const importLogoPresets = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_LOGO_PRESET_IMPORT_BYTES) { flashNotice("ไฟล์ preset ต้องมีขนาดไม่เกิน 3 MB"); event.target.value = ""; return; }
+    try {
+      const imported = parseLogoPresetImport(await file.text());
+      if (!imported.length) { flashNotice("ไม่พบ preset ที่นำเข้าได้ กรุณาเลือกไฟล์ Tools Thai ที่ถูกต้อง"); return; }
+      setLogoPresets((current) => mergeLogoPresets(current, imported));
+      flashNotice(`นำเข้า preset โลโก้ ${imported.length} รายการแล้ว`);
+    } catch {
+      flashNotice("ไม่สามารถอ่านไฟล์ preset ได้ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      event.target.value = "";
+    }
   };
   const updateLogoCrop = (update: Partial<BusinessDocument["logoCrop"]>) => setDocument((current) => ({ ...current, logoCrop: boundedLogoCrop({ ...current.logoCrop, ...update }) }));
   const handleDocumentAsset = (event: ChangeEvent<HTMLInputElement>, field: "signatureUrl" | "stampUrl", label: string) => {
@@ -447,9 +480,9 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
 	                  <DocumentAssetTile label="ตรายาง" previewUrl={document.stampUrl || ""} previewHighlight="signature" onChange={(event) => handleDocumentAsset(event, "stampUrl", "ตรายาง")} onRemove={() => removeDocumentAsset("stampUrl", "ตรายาง")} />
 	                </div>
 	                <section className="logo-presets" data-preview-highlight="company" aria-label="โลโก้ที่ใช้บ่อย">
-	                  <div className="logo-presets-heading"><div><strong>โลโก้ที่ใช้บ่อย</strong><span>บันทึกได้สูงสุด {MAX_LOGO_PRESETS} แบรนด์ในอุปกรณ์นี้</span></div></div>
-	                  {document.company.logoUrl && <div className="save-logo-preset"><input value={logoPresetName} onChange={(event) => setLogoPresetName(event.target.value)} maxLength={40} placeholder="ชื่อแบรนด์ เช่น ร้าน A" aria-label="ชื่อ preset โลโก้" /><button type="button" disabled={!logoPresetName.trim()} onClick={saveLogoPreset}><Save size={14} /> บันทึก preset</button></div>}
-	                  {logoPresets.length ? <div className="logo-preset-list">{logoPresets.map((preset) => <div className="logo-preset-card" key={preset.id}><button type="button" className="logo-preset-select" onClick={() => applyLogoPreset(preset)}><span><img src={preset.logoUrl} alt="" /></span><strong>{preset.name}</strong></button><button type="button" className="logo-preset-remove" onClick={() => removeLogoPreset(preset.id)} aria-label={`ลบ preset ${preset.name}`} title={`ลบ ${preset.name}`}><Trash2 size={14} /></button></div>)}</div> : <p className="logo-preset-empty">ยังไม่มี preset — อัปโหลดหรือเลือกโลโก้ แล้วตั้งชื่อเพื่อบันทึกไว้ใช้ครั้งถัดไป</p>}
+	                  <div className="logo-presets-heading"><div><strong>โลโก้ที่ใช้บ่อย</strong><span>บันทึกได้สูงสุด {MAX_LOGO_PRESETS} แบรนด์ในอุปกรณ์นี้</span></div><div className="logo-preset-transport"><button type="button" onClick={exportLogoPresets} disabled={!logoPresets.length}><Download size={13} /> ส่งออก</button><label><Upload size={13} /> นำเข้า<input type="file" accept="application/json,.json" onChange={importLogoPresets} /></label></div></div>
+	                  {document.company.logoUrl && <><div className="save-logo-preset"><input value={logoPresetName} onChange={(event) => setLogoPresetName(event.target.value)} maxLength={40} placeholder="ชื่อแบรนด์ เช่น ร้าน A" aria-label="ชื่อ preset โลโก้" /><select value={logoPresetCategory} onChange={(event) => setLogoPresetCategory(event.target.value as LogoPresetCategory)} aria-label="หมวดหมู่ preset">{logoPresetCategories.map((category) => <option value={category} key={category}>{category}</option>)}</select><button type="button" disabled={!logoPresetName.trim()} onClick={saveLogoPreset}><Save size={14} /> บันทึก preset</button></div><p className="logo-preset-company-hint">บันทึกโลโก้พร้อมชื่อบริษัท ที่อยู่ เลขภาษี โทรศัพท์ และอีเมลปัจจุบัน เพื่อเติมให้อัตโนมัติเมื่อเลือกแบรนด์</p></>}
+	                  {logoPresets.length ? <><div className="logo-preset-filter-row"><label><Search size={14} /><input value={logoPresetSearch} onChange={(event) => setLogoPresetSearch(event.target.value)} placeholder="ค้นหาชื่อแบรนด์" aria-label="ค้นหา preset โลโก้" /></label><label><Tags size={14} /><select value={logoPresetFilter} onChange={(event) => setLogoPresetFilter(event.target.value as LogoPresetCategory | "all")} aria-label="กรองหมวดหมู่ preset"><option value="all">ทุกหมวดหมู่</option>{logoPresetCategories.map((category) => <option value={category} key={category}>{category}</option>)}</select></label></div>{visibleLogoPresets.length ? <div className="logo-preset-list">{visibleLogoPresets.map((preset) => <div className="logo-preset-card" key={preset.id}><button type="button" className="logo-preset-select" onClick={() => applyLogoPreset(preset)}><span><img src={preset.logoUrl} alt="" /></span><span className="logo-preset-copy"><strong>{preset.name}</strong><small>{preset.company.name || "โลโก้และการจัดวางที่บันทึก"}</small><em>{preset.category}</em></span></button><button type="button" className="logo-preset-remove" onClick={() => removeLogoPreset(preset.id)} aria-label={`ลบ preset ${preset.name}`} title={`ลบ ${preset.name}`}><Trash2 size={14} /></button></div>)}</div> : <p className="logo-preset-empty">ไม่พบ preset ที่ตรงกับคำค้นหาหรือหมวดหมู่นี้</p>}</> : <p className="logo-preset-empty">ยังไม่มี preset — อัปโหลดหรือเลือกโลโก้ แล้วตั้งชื่อเพื่อบันทึกไว้ใช้ครั้งถัดไป</p>}
 	                </section>
 	                {lastRemovedLogo && <button type="button" className="undo-logo-button" data-preview-highlight="company" onClick={undoRemoveLogo}><Undo2 size={15} /> เลิกทำการลบโลโก้</button>}
 	                {document.company.logoUrl && <div className="logo-transform-controls" data-preview-highlight="company"><div><strong>ขนาดและตำแหน่งโลโก้</strong><span>ปรับผลที่แสดงในหัวเอกสารและ PDF ได้ทันที</span></div><label>ขนาด <input type="range" min="0.65" max="1.45" step="0.05" value={boundedLogoScale(document.logoScale || defaultLogoScale)} onChange={(event) => updateLogoTransform({ position: document.logoPosition || defaultLogoPosition, scale: Number(event.target.value) })} /><output>{Math.round(boundedLogoScale(document.logoScale || defaultLogoScale) * 100)}%</output></label><label>แนวนอน <input type="range" min="-24" max="24" step="1" value={boundedLogoPosition(document.logoPosition || defaultLogoPosition).x} onChange={(event) => updateLogoTransform({ position: { ...boundedLogoPosition(document.logoPosition || defaultLogoPosition), x: Number(event.target.value) }, scale: document.logoScale || defaultLogoScale })} /><output>{boundedLogoPosition(document.logoPosition || defaultLogoPosition).x}</output></label><label>แนวตั้ง <input type="range" min="-18" max="18" step="1" value={boundedLogoPosition(document.logoPosition || defaultLogoPosition).y} onChange={(event) => updateLogoTransform({ position: { ...boundedLogoPosition(document.logoPosition || defaultLogoPosition), y: Number(event.target.value) }, scale: document.logoScale || defaultLogoScale })} /><output>{boundedLogoPosition(document.logoPosition || defaultLogoPosition).y}</output></label><div className="logo-align-actions"><button type="button" onClick={() => updateLogoTransform({ position: { x: -16, y: 0 }, scale: document.logoScale || defaultLogoScale })}>ชิดซ้าย</button><button type="button" onClick={() => updateLogoTransform({ position: defaultLogoPosition, scale: document.logoScale || defaultLogoScale })}>กึ่งกลาง</button><button type="button" onClick={() => updateLogoTransform({ position: { x: 16, y: 0 }, scale: document.logoScale || defaultLogoScale })}>ชิดขวา</button></div><button type="button" className="reset-logo-transform" onClick={resetLogoTransform}>รีเซ็ตขนาดและตำแหน่ง</button></div>}
