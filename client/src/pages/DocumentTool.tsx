@@ -12,6 +12,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import SeoMeta from "@/components/SeoMeta";
 import { getDocumentSeo, getDocumentStructuredData } from "@shared/seo";
+import { validateDocumentAssetFile } from "@/lib/documentAssets";
 import "../styles/document-typography.css";
 import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
 
@@ -210,6 +211,14 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     if (!file || !file.type.startsWith("image/")) return;
     updateParty("company", "logoUrl", URL.createObjectURL(file));
   };
+  const handleDocumentAsset = (event: ChangeEvent<HTMLInputElement>, field: "signatureUrl" | "stampUrl", label: string) => {
+    const file = event.target.files?.[0];
+    const validation = validateDocumentAssetFile(file, label);
+    if (!validation.valid) { flashNotice(validation.message); return; }
+    if (!file) return;
+    updateDocument(field, URL.createObjectURL(file));
+    event.target.value = "";
+  };
 
   const handlePdfExport = async () => {
     const printable = window.document.getElementById("printable-document");
@@ -256,12 +265,12 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const applySavedCompany = () => {
     const profile = profileQuery.data;
     if (!profile) return;
-    setDocument((current) => ({ ...current, company: { name: profile.name, address: profile.address || "", taxId: profile.taxId || "", phone: profile.phone || "", email: profile.email || "", logoUrl: profile.logoUrl || "" } }));
+    setDocument((current) => ({ ...current, company: { name: profile.name, address: profile.address || "", taxId: profile.taxId || "", phone: profile.phone || "", email: profile.email || "", logoUrl: profile.logoUrl || "" }, signatureUrl: profile.signatureUrl || "", stampUrl: profile.stampUrl || "" }));
   };
   const handleAccountSave = () => {
     if (!isAuthenticated) { startLogin(); return; }
     const profileLogo = profileQuery.data?.logoUrl || "";
-    const persistable = { ...document, company: { ...document.company, logoUrl: document.company.logoUrl.startsWith("blob:") ? profileLogo : document.company.logoUrl } };
+    const persistable = { ...document, company: { ...document.company, logoUrl: document.company.logoUrl.startsWith("blob:") ? profileLogo : document.company.logoUrl }, signatureUrl: document.signatureUrl?.startsWith("blob:") ? profileQuery.data?.signatureUrl || "" : document.signatureUrl, stampUrl: document.stampUrl?.startsWith("blob:") ? profileQuery.data?.stampUrl || "" : document.stampUrl };
     saveDocument.mutate({ kind: document.kind, documentNumber: document.documentNumber || makeDocumentNumber(kind), customerName: document.customer.name || undefined, payload: JSON.stringify(persistable) });
   };
 
@@ -293,11 +302,11 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
               <div className="accent-picker" aria-label="เลือกสีหลักของเอกสาร">{accentChoices.map((color) => <button type="button" key={color} className={accentColor === color ? "is-selected" : ""} onClick={() => setAccentColor(color)} style={{ backgroundColor: color }} aria-label={`เลือกสี ${color}`} />)}</div>
               <div className="document-assets-row">
                 <label className="asset-upload-tile"><span className="asset-preview">{document.company.logoUrl ? <img src={document.company.logoUrl} alt="ตัวอย่างโลโก้" /> : <WandSparkles size={18} />}</span><strong>โลโก้</strong><span><Upload size={13} /> อัปโหลด</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogo} /></label>
-                <div className="asset-static-tile"><span>ลายเซ็น</span><small>แสดงในช่องลงนาม</small></div>
-                <div className="asset-static-tile"><span>ตรายาง</span><small>เพิ่มเป็นรูปภาพได้</small></div>
+                <label className="asset-upload-tile"><span className="asset-preview">{document.signatureUrl ? <img src={document.signatureUrl} alt="ตัวอย่างลายเซ็น" /> : <WandSparkles size={18} />}</span><strong>ลายเซ็น</strong><span><Upload size={13} /> อัปโหลด</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => handleDocumentAsset(event, "signatureUrl", "ลายเซ็น")} /></label>
+                <label className="asset-upload-tile"><span className="asset-preview">{document.stampUrl ? <img src={document.stampUrl} alt="ตัวอย่างตรายาง" /> : <WandSparkles size={18} />}</span><strong>ตรายาง</strong><span><Upload size={13} /> อัปโหลด</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => handleDocumentAsset(event, "stampUrl", "ตรายาง")} /></label>
               </div>
               {profileQuery.data && <button type="button" className="apply-template-button" onClick={applySavedCompany}>ใช้ template บริษัทที่บันทึก</button>}
-              <p className="design-hint">แนะนำ: ใช้ไฟล์โลโก้พื้นหลังโปร่งใส (PNG) เพื่อให้อ่านชัดบนเอกสาร</p>
+              <p className="design-hint">แนะนำ: ใช้ไฟล์ PNG พื้นหลังโปร่งใสสำหรับลายเซ็นและตรายาง ขนาดไม่เกิน 500 KB เพื่อให้ดูคมชัดใน PDF</p>
             </section>
 
             <section className="form-section">

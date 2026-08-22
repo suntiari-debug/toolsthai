@@ -40,6 +40,8 @@ describe("document calculations", () => {
     quotation.documentNumber = "QT-202608-008";
     quotation.company.name = "บริษัท ทดสอบ จำกัด";
     quotation.customer.name = "ลูกค้าทดสอบ";
+    quotation.signatureUrl = "/manus-storage/company-signatures/signature.png";
+    quotation.stampUrl = "/manus-storage/company-stamps/stamp.png";
     quotation.items = [{ id: "item-1", name: "บริการออกแบบ", description: "งานเดือนสิงหาคม", quantity: 2, unit: "ชั่วโมง", unitPrice: 1500 }];
     const targets = [
       ["invoice", "IV"],
@@ -54,6 +56,8 @@ describe("document calculations", () => {
       expect(converted.customer).toEqual(quotation.customer);
       expect(converted.items).toEqual(quotation.items);
       expect(converted.items).not.toBe(quotation.items);
+      expect(converted.signatureUrl).toBe(quotation.signatureUrl);
+      expect(converted.stampUrl).toBe(quotation.stampUrl);
     }
   });
 
@@ -61,10 +65,14 @@ describe("document calculations", () => {
     const quotation = createInitialDocument("quotation");
     quotation.company.name = "บริษัท ทดสอบ จำกัด";
     quotation.customer.name = "ลูกค้าทดสอบ";
+    quotation.signatureUrl = "/manus-storage/company-signatures/signature.png";
+    quotation.stampUrl = "/manus-storage/company-stamps/stamp.png";
     quotation.items = [{ id: "item-2", name: "บริการรายเดือน", description: "สิงหาคม", quantity: 1, unit: "เดือน", unitPrice: 2500 }];
     const converted = convertDocument(quotation, "receipt");
     const restored = restoreDocument(JSON.stringify(converted), "receipt");
     expect(restored).toEqual(converted);
     expect(restored.documentNumber).toMatch(/^RC-/);
+    expect(restored.signatureUrl).toBe("/manus-storage/company-signatures/signature.png");
+    expect(restored.stampUrl).toBe("/manus-storage/company-stamps/stamp.png");
   });
 });

@@ -120,3 +120,7 @@
 - [x] เพิ่ม privacy-safe event schema และ helper สำหรับ Landing Page tracking
 - [x] เชื่อม Tracking Event กับ CTA และ Tool Card ของหน้าแรก
 - [x] เพิ่ม regression tests และตรวจการส่ง event โดยไม่เก็บข้อมูลเอกสารส่วนบุคคล
+- [x] ตรวจ data model, preview และ PDF export ปัจจุบันสำหรับลายเซ็นและตรายาง
+- [x] เพิ่มการอัปโหลดลายเซ็นและตรายางพร้อม validation ชนิดและขนาดไฟล์
+- [x] แสดงลายเซ็นและตรายางในตัวอย่างเอกสารและ PDF สำหรับเอกสารที่รองรับ
+- [x] เพิ่ม regression tests และตรวจ preview/PDF หลังอัปโหลดภาพ

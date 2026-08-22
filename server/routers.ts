@@ -15,15 +15,19 @@ const companyProfileInput = z.object({
   email: z.string().trim().email().max(320).or(z.literal("")).optional(),
   logoDataUrl: z.string().max(750_000).optional(),
   existingLogoUrl: z.string().max(1024).optional(),
+  signatureDataUrl: z.string().max(750_000).optional(),
+  existingSignatureUrl: z.string().max(1024).optional(),
+  stampDataUrl: z.string().max(750_000).optional(),
+  existingStampUrl: z.string().max(1024).optional(),
 });
 
-function getLogoUpload(logoDataUrl: string) {
-  const match = logoDataUrl.match(/^data:(image\/(png|jpeg|webp));base64,(.+)$/);
+function getImageUpload(imageDataUrl: string, label: string) {
+  const match = imageDataUrl.match(/^data:(image\/(png|jpeg|webp));base64,(.+)$/);
   if (!match) throw new Error("รองรับเฉพาะไฟล์ PNG, JPG และ WEBP");
   const mimeType = match[1];
   const extension = match[2] === "jpeg" ? "jpg" : match[2];
   const buffer = Buffer.from(match[3], "base64");
-  if (buffer.length > 500_000) throw new Error("ไฟล์โลโก้ต้องมีขนาดไม่เกิน 500 KB");
+  if (buffer.length > 500_000) throw new Error(`ไฟล์${label}ต้องมีขนาดไม่เกิน 500 KB`);
   return { mimeType, extension, buffer };
 }
 
@@ -41,12 +45,24 @@ export const appRouter = router({
     get: protectedProcedure.query(async ({ ctx }) => (await db.getCompanyProfile(ctx.user.id)) ?? null),
     save: protectedProcedure.input(companyProfileInput).mutation(async ({ ctx, input }) => {
       let logoUrl = input.existingLogoUrl || null;
+      let signatureUrl = input.existingSignatureUrl || null;
+      let stampUrl = input.existingStampUrl || null;
       if (input.logoDataUrl) {
-        const upload = getLogoUpload(input.logoDataUrl);
+        const upload = getImageUpload(input.logoDataUrl, "โลโก้");
         const result = await storagePut(`company-logos/${ctx.user.id}/${Date.now()}.${upload.extension}`, upload.buffer, upload.mimeType);
         logoUrl = result.url;
       }
-      return db.saveCompanyProfile({ userId: ctx.user.id, name: input.name, address: input.address || null, taxId: input.taxId || null, phone: input.phone || null, email: input.email || null, logoUrl });
+      if (input.signatureDataUrl) {
+        const upload = getImageUpload(input.signatureDataUrl, "ลายเซ็น");
+        const result = await storagePut(`company-signatures/${ctx.user.id}/${Date.now()}.${upload.extension}`, upload.buffer, upload.mimeType);
+        signatureUrl = result.url;
+      }
+      if (input.stampDataUrl) {
+        const upload = getImageUpload(input.stampDataUrl, "ตรายาง");
+        const result = await storagePut(`company-stamps/${ctx.user.id}/${Date.now()}.${upload.extension}`, upload.buffer, upload.mimeType);
+        stampUrl = result.url;
+      }
+      return db.saveCompanyProfile({ userId: ctx.user.id, name: input.name, address: input.address || null, taxId: input.taxId || null, phone: input.phone || null, email: input.email || null, logoUrl, signatureUrl, stampUrl });
     }),
   }),
   documents: router({

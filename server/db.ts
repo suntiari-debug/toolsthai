@@ -53,11 +53,11 @@ export async function getCompanyProfile(userId: number) {
   return result[0] ?? null;
 }
 
-export async function saveCompanyProfile(input: { userId: number; name: string; address?: string | null; taxId?: string | null; phone?: string | null; email?: string | null; logoUrl?: string | null }) {
+export async function saveCompanyProfile(input: { userId: number; name: string; address?: string | null; taxId?: string | null; phone?: string | null; email?: string | null; logoUrl?: string | null; signatureUrl?: string | null; stampUrl?: string | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   await db.insert(companyProfiles).values(input).onDuplicateKeyUpdate({
-    set: { name: input.name, address: input.address ?? null, taxId: input.taxId ?? null, phone: input.phone ?? null, email: input.email ?? null, logoUrl: input.logoUrl ?? null },
+    set: { name: input.name, address: input.address ?? null, taxId: input.taxId ?? null, phone: input.phone ?? null, email: input.email ?? null, logoUrl: input.logoUrl ?? null, signatureUrl: input.signatureUrl ?? null, stampUrl: input.stampUrl ?? null },
   });
   return getCompanyProfile(input.userId);
 }

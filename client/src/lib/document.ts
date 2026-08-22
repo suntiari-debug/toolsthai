@@ -34,6 +34,8 @@ export type BusinessDocument = {
   vatMode: "excluded" | "included" | "none";
   note: string;
   signerName?: string;
+  signatureUrl?: string;
+  stampUrl?: string;
   watermark: boolean;
 };
 
@@ -79,6 +81,8 @@ export function createInitialDocument(kind: DocumentKind): BusinessDocument {
     vatMode: "excluded",
     note: "ขอบพระคุณที่ไว้วางใจใช้บริการ",
     signerName: "",
+    signatureUrl: "",
+    stampUrl: "",
     watermark: false,
   };
 }
@@ -100,6 +104,8 @@ export function restoreDocument(payload: string, activeKind: DocumentKind): Busi
     ...document,
     kind: activeKind,
     signerName: document.signerName || "",
+    signatureUrl: document.signatureUrl || "",
+    stampUrl: document.stampUrl || "",
     company: { ...document.company },
     customer: { ...document.customer },
     items: document.items.map((item) => ({ ...item })),

@@ -21,6 +21,8 @@ export const companyProfiles = mysqlTable("company_profiles", {
   phone: varchar("phone", { length: 64 }),
   email: varchar("email", { length: 320 }),
   logoUrl: text("logoUrl"),
+  signatureUrl: text("signatureUrl"),
+  stampUrl: text("stampUrl"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

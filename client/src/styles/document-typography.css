@@ -173,6 +173,44 @@
   font-size: .76rem;
 }
 
+.document-tool-page .pdf-signatures .pdf-signature-recipient,
+.document-tool-page .pdf-signatures .pdf-signature-company {
+  display: grid;
+  grid-template-rows: 3.55rem 1px auto auto;
+  gap: .28rem;
+}
+
+.document-tool-page .pdf-signatures .pdf-signature-artwork {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 3.55rem;
+}
+
+.document-tool-page .pdf-signatures .pdf-signature-company i,
+.document-tool-page .pdf-signatures .pdf-signature-recipient i {
+  order: initial;
+  margin: 0;
+}
+
+.document-tool-page .pdf-signature-image {
+  max-width: 8.6rem;
+  max-height: 3rem;
+  object-fit: contain;
+}
+
+.document-tool-page .pdf-stamp-image {
+  position: absolute;
+  right: 9%;
+  bottom: .08rem;
+  max-width: 3.2rem;
+  max-height: 3.2rem;
+  object-fit: contain;
+  opacity: .88;
+  transform: rotate(-8deg);
+}
+
 @media (max-width: 540px) {
   .document-tool-page .workspace-action,
   .document-tool-page .autosave-status,

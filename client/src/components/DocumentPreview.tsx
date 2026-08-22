@@ -45,7 +45,7 @@ export default function DocumentPreview({ document, accentColor = "#0d7a75", tem
         <div className="pdf-note"><span className="pdf-section-label">จำนวนเงิน (ตัวอักษร)</span><p className="pdf-amount-words">{amountToThaiWords(totals.total)}</p><span className="pdf-section-label note-label">หมายเหตุ</span><p>{document.note || "—"}</p></div>
         <div className="pdf-totals"><div><span>มูลค่าสินค้า / บริการ</span><strong>{formatTHB(totals.subtotal)}</strong></div>{totals.discount > 0 && <div><span>ส่วนลด</span><strong>-{formatTHB(totals.discount)}</strong></div>}{document.vatMode !== "none" && <div><span>ภาษีมูลค่าเพิ่ม {document.vatRate}%</span><strong>{formatTHB(totals.vat)}</strong></div>}<div className="pdf-grand-total"><span>ยอดสุทธิ (บาท)</span><strong>{formatTHB(totals.total)}</strong></div></div>
       </section>
-      <footer className="pdf-signatures"><div><i /><span>ผู้รับเอกสาร / ลูกค้า</span><small>วันที่ ____/____/____</small></div><div><i /><span>{document.signerName || "ผู้มีอำนาจลงนาม"}</span><small>วันที่ ____/____/____</small></div></footer>
+      <footer className="pdf-signatures"><div className="pdf-signature-recipient"><div className="pdf-signature-artwork" /><i /><span>ผู้รับเอกสาร / ลูกค้า</span><small>วันที่ ____/____/____</small></div><div className="pdf-signature-company"><div className="pdf-signature-artwork">{document.signatureUrl && <img className="pdf-signature-image" src={document.signatureUrl} alt="ลายเซ็นผู้มีอำนาจ" />}{document.stampUrl && <img className="pdf-stamp-image" src={document.stampUrl} alt="ตรายางบริษัท" />}</div><i /><span>{document.signerName || "ผู้มีอำนาจลงนาม"}</span><small>วันที่ ____/____/____</small></div></footer>
     </article>
   );
 }
