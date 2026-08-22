@@ -53,11 +53,11 @@ export async function getCompanyProfile(userId: number) {
   return result[0] ?? null;
 }
 
-export async function saveCompanyProfile(input: { userId: number; name: string; address?: string | null; taxId?: string | null; phone?: string | null; email?: string | null; logoUrl?: string | null; signatureUrl?: string | null; stampUrl?: string | null; signerName?: string | null; signerPosition?: string | null }) {
+export async function saveCompanyProfile(input: { userId: number; name: string; address?: string | null; taxId?: string | null; phone?: string | null; email?: string | null; logoUrl?: string | null; signatureUrl?: string | null; stampUrl?: string | null; signerName?: string | null; signerPosition?: string | null; defaultDocumentTemplate?: "modern" | "classic" | "minimal" | null; defaultAccentColor?: string | null; defaultFontFamily?: "sarabun" | "noto-sans" | "noto-serif" | null; defaultFontSize?: "small" | "medium" | "large" | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   await db.insert(companyProfiles).values(input).onDuplicateKeyUpdate({
-    set: { name: input.name, address: input.address ?? null, taxId: input.taxId ?? null, phone: input.phone ?? null, email: input.email ?? null, logoUrl: input.logoUrl ?? null, signatureUrl: input.signatureUrl ?? null, stampUrl: input.stampUrl ?? null, signerName: input.signerName ?? null, signerPosition: input.signerPosition ?? null },
+    set: { name: input.name, address: input.address ?? null, taxId: input.taxId ?? null, phone: input.phone ?? null, email: input.email ?? null, logoUrl: input.logoUrl ?? null, signatureUrl: input.signatureUrl ?? null, stampUrl: input.stampUrl ?? null, signerName: input.signerName ?? null, signerPosition: input.signerPosition ?? null, defaultDocumentTemplate: input.defaultDocumentTemplate ?? null, defaultAccentColor: input.defaultAccentColor ?? null, defaultFontFamily: input.defaultFontFamily ?? null, defaultFontSize: input.defaultFontSize ?? null },
   });
   return getCompanyProfile(input.userId);
 }

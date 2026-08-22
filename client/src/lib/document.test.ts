@@ -49,6 +49,19 @@ describe("document calculations", () => {
     expect(boundedLogoCrop({ zoom: 7, x: -80, y: 80, brightness: 1, contrast: 500 })).toEqual({ zoom: 2.4, x: -34, y: 34, brightness: 70, contrast: 130 });
   });
 
+  it("creates, converts, and restores the selected document font and size", () => {
+    const document = createInitialDocument("quotation");
+    expect(document.template).toBe("classic");
+    expect(document.fontFamily).toBe("sarabun");
+    expect(document.fontSize).toBe("medium");
+    document.template = "minimal";
+    document.accentColor = "#7c3aed";
+    document.fontFamily = "noto-serif";
+    document.fontSize = "large";
+    const restored = restoreDocument(JSON.stringify(convertDocument(document, "invoice")), "invoice");
+    expect(restored).toMatchObject({ template: "minimal", accentColor: "#7c3aed", fontFamily: "noto-serif", fontSize: "large" });
+  });
+
   it("converts a quotation to every downstream document while preserving company, customer, and items", () => {
     const quotation = createInitialDocument("quotation");
     quotation.documentNumber = "QT-202608-008";

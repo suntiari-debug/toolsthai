@@ -21,6 +21,10 @@ const companyProfileInput = z.object({
   existingStampUrl: z.string().max(1024).optional(),
   signerName: z.string().trim().max(255).optional(),
   signerPosition: z.string().trim().max(255).optional(),
+  defaultDocumentTemplate: z.enum(["modern", "classic", "minimal"]).optional(),
+  defaultAccentColor: z.string().regex(/^#[0-9a-f]{6}$/i).optional(),
+  defaultFontFamily: z.enum(["sarabun", "noto-sans", "noto-serif"]).optional(),
+  defaultFontSize: z.enum(["small", "medium", "large"]).optional(),
 });
 
 function getImageUpload(imageDataUrl: string, label: string) {
@@ -64,7 +68,7 @@ export const appRouter = router({
         const result = await storagePut(`company-stamps/${ctx.user.id}/${Date.now()}.${upload.extension}`, upload.buffer, upload.mimeType);
         stampUrl = result.url;
       }
-      return db.saveCompanyProfile({ userId: ctx.user.id, name: input.name, address: input.address || null, taxId: input.taxId || null, phone: input.phone || null, email: input.email || null, logoUrl, signatureUrl, stampUrl, signerName: input.signerName || null, signerPosition: input.signerPosition || null });
+      return db.saveCompanyProfile({ userId: ctx.user.id, name: input.name, address: input.address || null, taxId: input.taxId || null, phone: input.phone || null, email: input.email || null, logoUrl, signatureUrl, stampUrl, signerName: input.signerName || null, signerPosition: input.signerPosition || null, defaultDocumentTemplate: input.defaultDocumentTemplate || null, defaultAccentColor: input.defaultAccentColor || null, defaultFontFamily: input.defaultFontFamily || null, defaultFontSize: input.defaultFontSize || null });
     }),
   }),
   documents: router({

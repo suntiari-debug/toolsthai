@@ -25,6 +25,10 @@ export const companyProfiles = mysqlTable("company_profiles", {
   stampUrl: text("stampUrl"),
   signerName: varchar("signerName", { length: 255 }),
   signerPosition: varchar("signerPosition", { length: 255 }),
+  defaultDocumentTemplate: varchar("defaultDocumentTemplate", { length: 32 }),
+  defaultAccentColor: varchar("defaultAccentColor", { length: 16 }),
+  defaultFontFamily: varchar("defaultFontFamily", { length: 32 }),
+  defaultFontSize: varchar("defaultFontSize", { length: 16 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

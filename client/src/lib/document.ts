@@ -82,6 +82,10 @@ export type BusinessDocument = {
   logoPosition?: LogoPosition;
   logoScale?: number;
   logoCrop?: LogoCrop;
+  template?: DocumentTemplate;
+  accentColor?: string;
+  fontFamily?: DocumentFontFamily;
+  fontSize?: DocumentFontSize;
   watermark: boolean;
 };
 
@@ -135,6 +139,10 @@ export function createInitialDocument(kind: DocumentKind): BusinessDocument {
     logoPosition: { ...defaultLogoPosition },
     logoScale: defaultLogoScale,
     logoCrop: { ...defaultLogoCrop },
+    template: defaultDocumentDesign.template,
+    accentColor: defaultDocumentDesign.accentColor,
+    fontFamily: defaultDocumentDesign.fontFamily,
+    fontSize: defaultDocumentDesign.fontSize,
     watermark: false,
   };
 }
@@ -164,6 +172,10 @@ export function restoreDocument(payload: string, activeKind: DocumentKind): Busi
     logoPosition: boundedLogoPosition(document.logoPosition || defaultLogoPosition),
     logoScale: boundedLogoScale(document.logoScale || defaultLogoScale),
     logoCrop: boundedLogoCrop(document.logoCrop),
+    template: normalizeDocumentTemplate(document.template),
+    accentColor: normalizeDocumentAccentColor(document.accentColor),
+    fontFamily: normalizeDocumentFontFamily(document.fontFamily),
+    fontSize: normalizeDocumentFontSize(document.fontSize),
     company: { ...document.company },
     customer: { ...document.customer },
     items: document.items.map((item) => ({ ...item })),
@@ -221,3 +233,4 @@ export function amountToThaiWords(amount: number) {
   const satang = value % 100;
   return `${toWords(baht)}บาท${satang === 0 ? "ถ้วน" : `${toWords(satang)}สตางค์`}`;
 }
+import { defaultDocumentDesign, normalizeDocumentAccentColor, normalizeDocumentFontFamily, normalizeDocumentFontSize, normalizeDocumentTemplate, type DocumentFontFamily, type DocumentFontSize, type DocumentTemplate } from "./documentDesign";

@@ -1,5 +1,6 @@
 import { type CSSProperties, useRef } from "react";
 import { BusinessDocument, StampPosition, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampScale, calculateDocumentTotals, defaultLogoPosition, defaultLogoScale, defaultStampPosition, defaultStampScale, documentMeta, formatNumber, formatTHB, formatThaiDate, amountToThaiWords } from "@/lib/document";
+import { normalizeDocumentFontFamily, normalizeDocumentFontSize, type DocumentFontFamily, type DocumentFontSize } from "@/lib/documentDesign";
 import type { PreviewHighlightTarget } from "@/lib/previewHighlight";
 import type { PreviewPan } from "@/lib/previewZoom";
 
@@ -7,6 +8,8 @@ type DocumentPreviewProps = {
   document: BusinessDocument;
   accentColor?: string;
   template?: "modern" | "classic" | "minimal";
+  fontFamily?: DocumentFontFamily;
+  fontSize?: DocumentFontSize;
   screenZoom?: -1 | 0 | 1;
   screenPan?: PreviewPan;
   activeHighlight?: PreviewHighlightTarget | null;
@@ -14,7 +17,7 @@ type DocumentPreviewProps = {
   onStampTransformChange?: (transform: { position: StampPosition; scale: number }) => void;
 };
 
-export default function DocumentPreview({ document, accentColor = "#0d7a75", template = "classic", screenZoom = 0, screenPan = { x: 0, y: 0 }, activeHighlight = null, isStampEditable = false, onStampTransformChange }: DocumentPreviewProps) {
+export default function DocumentPreview({ document, accentColor = "#0d7a75", template = "classic", fontFamily, fontSize, screenZoom = 0, screenPan = { x: 0, y: 0 }, activeHighlight = null, isStampEditable = false, onStampTransformChange }: DocumentPreviewProps) {
   const totals = calculateDocumentTotals(document);
   const meta = documentMeta[document.kind];
   const zoomClass = screenZoom === -1 ? "preview-zoom-out" : screenZoom === 1 ? "preview-zoom-in" : "preview-zoom-default";
@@ -25,6 +28,8 @@ export default function DocumentPreview({ document, accentColor = "#0d7a75", tem
   const logoPosition = boundedLogoPosition(document.logoPosition || defaultLogoPosition);
   const logoScale = boundedLogoScale(document.logoScale || defaultLogoScale);
   const logoCrop = boundedLogoCrop(document.logoCrop);
+  const resolvedFontFamily = normalizeDocumentFontFamily(fontFamily ?? document.fontFamily);
+  const resolvedFontSize = normalizeDocumentFontSize(fontSize ?? document.fontSize);
   const highlightClass = (target: PreviewHighlightTarget) => activeHighlight === target ? " is-preview-highlighted" : "";
   const startStampPointer = (event: React.PointerEvent<HTMLButtonElement>, action: "move" | "resize") => {
     if (!isStampEditable || !document.stampUrl || !onStampTransformChange) return;
@@ -54,7 +59,7 @@ export default function DocumentPreview({ document, accentColor = "#0d7a75", tem
     stampPointer.current = null;
   };
   return (
-    <article className={`document-preview ${zoomClass}${highlightClass("document")}`} id="printable-document" data-template={template} data-preview-region="document" style={{ "--document-accent": accentColor, "--preview-pan-x": `${screenPan.x}px`, "--preview-pan-y": `${screenPan.y}px` } as CSSProperties}>
+    <article className={`document-preview ${zoomClass}${highlightClass("document")}`} id="printable-document" data-template={template} data-font-family={resolvedFontFamily} data-font-size={resolvedFontSize} data-preview-region="document" style={{ "--document-accent": accentColor, "--preview-pan-x": `${screenPan.x}px`, "--preview-pan-y": `${screenPan.y}px` } as CSSProperties}>
       {document.watermark && <div className="document-watermark">TOOLS THAI</div>}
       <header className={`pdf-header${highlightClass("company")}`} data-preview-region="company">
         <div className="pdf-company">

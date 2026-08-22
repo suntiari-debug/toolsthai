@@ -15,13 +15,13 @@ import SeoMeta from "@/components/SeoMeta";
 import { getDocumentSeo, getDocumentStructuredData } from "@shared/seo";
 import { isTemporaryDocumentAssetUrl, readDocumentAssetAsDataUrl, validateDocumentAssetFile } from "@/lib/documentAssets";
 import { getDocumentValidationIssues } from "@/lib/documentValidation";
+import { businessDocumentTemplates, documentFontChoices, documentFontSizeChoices, normalizeDocumentAccentColor, normalizeDocumentFontFamily, normalizeDocumentFontSize, normalizeDocumentTemplate, type DocumentDesignSettings, type DocumentTemplate } from "@/lib/documentDesign";
 import { createLogoPresetExport, filterLogoPresets, LEGACY_LOGO_PRESETS_STORAGE_KEY, LOGO_PRESETS_STORAGE_KEY, logoPresetCategories, MAX_LOGO_PRESET_IMPORT_BYTES, MAX_LOGO_PRESETS, mergeLogoPresets, parseLogoPresetImport, parseStoredPreviewHighlight, PREVIEW_HIGHLIGHT_PREFERENCE_STORAGE_KEY, sanitizeLogoPresets, serializeLogoPresets, type LogoPreset, type LogoPresetCategory } from "@/lib/documentPreferences";
 import { getItemPreviewHighlightTarget, getPreviewHighlightTarget, type PreviewHighlightTarget } from "@/lib/previewHighlight";
 import "../styles/document-typography.css";
 import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollBehavior, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
 
 type DocumentToolProps = { kind: DocumentKind };
-type DocumentTemplate = "modern" | "classic" | "minimal";
 type RemovedLogo = { logoUrl: string; position: { x: number; y: number }; scale: number; crop: NonNullable<BusinessDocument["logoCrop"]> };
 
 const convertTargets: Record<DocumentKind, DocumentKind[]> = {
@@ -46,8 +46,6 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const [document, setDocument] = useState<BusinessDocument>(() => createInitialDocument(kind));
   const [notice, setNotice] = useState("");
   const [isExporting, setIsExporting] = useState(false);
-  const [template, setTemplate] = useState<DocumentTemplate>("classic");
-  const [accentColor, setAccentColor] = useState("#0d7a75");
   const [previewZoom, setPreviewZoom] = useState<PreviewZoom>(0);
   const [previewPan, setPreviewPan] = useState<PreviewPan>({ x: 0, y: 0 });
   const [isPreviewZoomRestored, setIsPreviewZoomRestored] = useState(false);
@@ -73,7 +71,9 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const skipPreviewZoomPersistence = useRef<string | null>(null);
   const previewResetAnimationTimer = useRef<number | null>(null);
   const previewColumnRef = useRef<HTMLElement | null>(null);
+  const companyDefaultsApplied = useRef(false);
   const profileQuery = trpc.companyProfile.get.useQuery(undefined, { enabled: isAuthenticated });
+  const saveCompanyDesign = trpc.companyProfile.save.useMutation({ onSuccess: () => { void profileQuery.refetch(); flashNotice("บันทึกดีไซน์เริ่มต้นของบริษัทแล้ว"); }, onError: () => flashNotice("ไม่สามารถบันทึกดีไซน์เริ่มต้นของบริษัทได้") });
   const flashNotice = (message: string) => {
     setNotice(message);
     window.setTimeout(() => setNotice(""), 3200);
@@ -85,6 +85,10 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const meta = documentMeta[kind];
   const seo = getDocumentSeo(kind);
   const totals = useMemo(() => calculateDocumentTotals(document), [document]);
+  const template = normalizeDocumentTemplate(document.template);
+  const accentColor = normalizeDocumentAccentColor(document.accentColor);
+  const fontFamily = normalizeDocumentFontFamily(document.fontFamily);
+  const fontSize = normalizeDocumentFontSize(document.fontSize);
   const pdfValidationIssues = useMemo(() => getDocumentValidationIssues(document), [document]);
   const logoCrop = boundedLogoCrop(document.logoCrop);
   const previewZoomLabel = previewZoom === -1 ? "90%" : previewZoom === 1 ? "110%" : "100%";
@@ -93,6 +97,13 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const previewZoomStorageKey = getPreviewZoomStorageKey(kind, previewZoomDevice);
   const updatePreviewZoom = (value: number) => setPreviewZoom(boundedPreviewZoom(value));
   const visibleLogoPresets = useMemo(() => filterLogoPresets(logoPresets, logoPresetSearch, logoPresetFilter), [logoPresetFilter, logoPresetSearch, logoPresets]);
+  const applyDesign = (design: Partial<DocumentDesignSettings>) => setDocument((current) => ({
+    ...current,
+    template: normalizeDocumentTemplate(design.template ?? current.template),
+    accentColor: normalizeDocumentAccentColor(design.accentColor ?? current.accentColor),
+    fontFamily: normalizeDocumentFontFamily(design.fontFamily ?? current.fontFamily),
+    fontSize: normalizeDocumentFontSize(design.fontSize ?? current.fontSize),
+  }));
   const scrollToPreview = () => {
     const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     previewColumnRef.current?.scrollIntoView({ behavior: getPreviewScrollBehavior(prefersReducedMotion), block: "start" });
@@ -264,6 +275,15 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     setDocument(createInitialDocument(kind));
   }, [kind]);
 
+  useEffect(() => {
+    const profile = profileQuery.data;
+    if (!profile || companyDefaultsApplied.current) return;
+    companyDefaultsApplied.current = true;
+    if (profile.defaultDocumentTemplate || profile.defaultAccentColor || profile.defaultFontFamily || profile.defaultFontSize) {
+      applyDesign({ template: profile.defaultDocumentTemplate as DocumentTemplate | undefined, accentColor: profile.defaultAccentColor || undefined, fontFamily: profile.defaultFontFamily as DocumentDesignSettings["fontFamily"] | undefined, fontSize: profile.defaultFontSize as DocumentDesignSettings["fontSize"] | undefined });
+    }
+  }, [profileQuery.data]);
+
   const updateDocument = <K extends keyof BusinessDocument>(key: K, value: BusinessDocument[K]) => setDocument((current) => ({ ...current, [key]: value }));
   const updateParty = (party: "company" | "customer", key: string, value: string) => setDocument((current) => ({ ...current, [party]: { ...current[party], [key]: value } }));
   const updateItem = (id: string, key: keyof LineItem, value: string | number) => setDocument((current) => ({ ...current, items: current.items.map((item) => item.id === id ? { ...item, [key]: value } : item) }));
@@ -389,6 +409,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     setActivePreviewHighlight(null);
     try {
       await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+      await window.document.fonts?.ready;
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
       const canvas = await html2canvas(printable, { backgroundColor: "#ffffff", scale: 2.5, useCORS: true, logging: false, windowWidth: printable.scrollWidth });
       const imageData = canvas.toDataURL("image/jpeg", 0.98);
@@ -438,6 +459,13 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     const profile = profileQuery.data;
     if (!profile) return;
     setDocument((current) => ({ ...current, company: { name: profile.name, address: profile.address || "", taxId: profile.taxId || "", phone: profile.phone || "", email: profile.email || "", logoUrl: profile.logoUrl || "" }, signerName: profile.signerName || "", signerPosition: profile.signerPosition || "", signatureUrl: profile.signatureUrl || "", stampUrl: profile.stampUrl || "" }));
+    applyDesign({ template: profile.defaultDocumentTemplate as DocumentTemplate | undefined, accentColor: profile.defaultAccentColor || undefined, fontFamily: profile.defaultFontFamily as DocumentDesignSettings["fontFamily"] | undefined, fontSize: profile.defaultFontSize as DocumentDesignSettings["fontSize"] | undefined });
+    flashNotice("ใช้ template และดีไซน์เริ่มต้นของบริษัทแล้ว");
+  };
+  const saveCurrentDesignAsCompanyDefault = () => {
+    const profile = profileQuery.data;
+    if (!profile) { startLogin(); return; }
+    saveCompanyDesign.mutate({ name: profile.name, address: profile.address || undefined, taxId: profile.taxId || undefined, phone: profile.phone || undefined, email: profile.email || undefined, existingLogoUrl: profile.logoUrl || undefined, existingSignatureUrl: profile.signatureUrl || undefined, existingStampUrl: profile.stampUrl || undefined, signerName: profile.signerName || undefined, signerPosition: profile.signerPosition || undefined, defaultDocumentTemplate: template, defaultAccentColor: accentColor, defaultFontFamily: fontFamily, defaultFontSize: fontSize });
   };
   const handleAccountSave = () => {
     if (!isAuthenticated) { startLogin(); return; }
@@ -468,12 +496,20 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
           <section className="document-form-card reference-form-panel print-hide" onFocusCapture={handleFormFocus} onBlurCapture={handleFormBlur} onClickCapture={handleFormClick}>
             <section className="form-section document-design-section">
               <CardHeading title="ดีไซน์เอกสาร" />
+              <p className="design-label">เทมเพลตตามประเภทธุรกิจ</p>
+              <div className="business-template-grid" aria-label="เลือกเทมเพลตตามประเภทธุรกิจ">
+                {businessDocumentTemplates.map((choice) => <button type="button" key={choice.id} className={`business-template-choice ${template === choice.template && accentColor === choice.accentColor && fontFamily === choice.fontFamily && fontSize === choice.fontSize ? "is-selected" : ""}`} data-preview-highlight="document" onClick={() => applyDesign(choice)}><span>{choice.category}</span><strong>{choice.title}</strong><small>{choice.description}</small></button>)}
+              </div>
               <p className="design-label">เทมเพลต</p>
               <div className="template-choice-grid">
-                {templateChoices.map((choice) => <button type="button" key={choice.id} className={`template-choice ${template === choice.id ? "is-selected" : ""}`} data-preview-highlight="document" onClick={() => setTemplate(choice.id)}><strong>{choice.title}</strong><small>{choice.description}</small></button>)}
+                {templateChoices.map((choice) => <button type="button" key={choice.id} className={`template-choice ${template === choice.id ? "is-selected" : ""}`} data-preview-highlight="document" onClick={() => applyDesign({ template: choice.id })}><strong>{choice.title}</strong><small>{choice.description}</small></button>)}
               </div>
               <p className="design-label">สีหลัก</p>
-              <div className="accent-picker" aria-label="เลือกสีหลักของเอกสาร">{accentChoices.map((color) => <button type="button" key={color} className={accentColor === color ? "is-selected" : ""} data-preview-highlight="document" onClick={() => setAccentColor(color)} style={{ backgroundColor: color }} aria-label={`เลือกสี ${color}`} />)}</div>
+              <div className="accent-picker" aria-label="เลือกสีหลักของเอกสาร">{accentChoices.map((color) => <button type="button" key={color} className={accentColor === color ? "is-selected" : ""} data-preview-highlight="document" onClick={() => applyDesign({ accentColor: color })} style={{ backgroundColor: color }} aria-label={`เลือกสี ${color}`} />)}</div>
+              <p className="design-label">แบบฟอนต์เอกสาร</p>
+              <div className="font-choice-grid" role="group" aria-label="เลือกแบบฟอนต์เอกสาร">{documentFontChoices.map((choice) => <button type="button" key={choice.id} className={fontFamily === choice.id ? "is-selected" : ""} data-preview-highlight="document" onClick={() => applyDesign({ fontFamily: choice.id })}><strong>{choice.title}</strong><small>{choice.description}</small></button>)}</div>
+              <p className="design-label">ขนาดฟอนต์ในเอกสาร</p>
+              <div className="font-size-choice-grid" role="group" aria-label="เลือกขนาดฟอนต์เอกสาร">{documentFontSizeChoices.map((choice) => <button type="button" key={choice.id} className={fontSize === choice.id ? "is-selected" : ""} data-preview-highlight="document" onClick={() => applyDesign({ fontSize: choice.id })}><strong>{choice.title}</strong><small>{choice.description}</small></button>)}</div>
                 <div className="document-assets-row">
                   <div className="asset-upload-tile" data-preview-highlight="company"><span className="asset-preview">{document.company.logoUrl ? <img src={document.company.logoUrl} alt="ตัวอย่างโลโก้" /> : <WandSparkles size={18} />}</span><strong>โลโก้</strong><label className="asset-upload-action"><Upload size={13} /> {document.company.logoUrl ? "เปลี่ยนรูป" : "อัปโหลด"}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogo} /></label>{document.company.logoUrl && <><button type="button" className="asset-edit-button" onClick={() => setIsLogoEditorOpen(true)}>ปรับแต่ง</button><AlertDialog open={isLogoRemoveOpen} onOpenChange={setIsLogoRemoveOpen}><AlertDialogTrigger asChild><button type="button" className="asset-remove-button">ลบรูป</button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ลบโลโก้ออกจากเอกสารนี้?</AlertDialogTitle><AlertDialogDescription>โลโก้จะหายจากตัวอย่างเอกสารและ PDF ปัจจุบัน แต่จะไม่ลบไฟล์ต้นฉบับที่เก็บอยู่ใน template บริษัท</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>ยกเลิก</AlertDialogCancel><AlertDialogAction onClick={removeLogo}>ลบโลโก้</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>}</div>
                   <DocumentAssetTile label="ลายเซ็น" previewUrl={document.signatureUrl || ""} previewHighlight="signature" onChange={(event) => handleDocumentAsset(event, "signatureUrl", "ลายเซ็น")} onRemove={() => removeDocumentAsset("signatureUrl", "ลายเซ็น")} />
@@ -487,7 +523,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
 	                {lastRemovedLogo && <button type="button" className="undo-logo-button" data-preview-highlight="company" onClick={undoRemoveLogo}><Undo2 size={15} /> เลิกทำการลบโลโก้</button>}
 	                {document.company.logoUrl && <div className="logo-transform-controls" data-preview-highlight="company"><div><strong>ขนาดและตำแหน่งโลโก้</strong><span>ปรับผลที่แสดงในหัวเอกสารและ PDF ได้ทันที</span></div><label>ขนาด <input type="range" min="0.65" max="1.45" step="0.05" value={boundedLogoScale(document.logoScale || defaultLogoScale)} onChange={(event) => updateLogoTransform({ position: document.logoPosition || defaultLogoPosition, scale: Number(event.target.value) })} /><output>{Math.round(boundedLogoScale(document.logoScale || defaultLogoScale) * 100)}%</output></label><label>แนวนอน <input type="range" min="-24" max="24" step="1" value={boundedLogoPosition(document.logoPosition || defaultLogoPosition).x} onChange={(event) => updateLogoTransform({ position: { ...boundedLogoPosition(document.logoPosition || defaultLogoPosition), x: Number(event.target.value) }, scale: document.logoScale || defaultLogoScale })} /><output>{boundedLogoPosition(document.logoPosition || defaultLogoPosition).x}</output></label><label>แนวตั้ง <input type="range" min="-18" max="18" step="1" value={boundedLogoPosition(document.logoPosition || defaultLogoPosition).y} onChange={(event) => updateLogoTransform({ position: { ...boundedLogoPosition(document.logoPosition || defaultLogoPosition), y: Number(event.target.value) }, scale: document.logoScale || defaultLogoScale })} /><output>{boundedLogoPosition(document.logoPosition || defaultLogoPosition).y}</output></label><div className="logo-align-actions"><button type="button" onClick={() => updateLogoTransform({ position: { x: -16, y: 0 }, scale: document.logoScale || defaultLogoScale })}>ชิดซ้าย</button><button type="button" onClick={() => updateLogoTransform({ position: defaultLogoPosition, scale: document.logoScale || defaultLogoScale })}>กึ่งกลาง</button><button type="button" onClick={() => updateLogoTransform({ position: { x: 16, y: 0 }, scale: document.logoScale || defaultLogoScale })}>ชิดขวา</button></div><button type="button" className="reset-logo-transform" onClick={resetLogoTransform}>รีเซ็ตขนาดและตำแหน่ง</button></div>}
                 {document.stampUrl && <div className="stamp-transform-controls" data-preview-highlight="signature"><div><strong>จัดวางตรายาง</strong><span>ลากตรายางบนตัวอย่างเอกสารเพื่อย้ายตำแหน่ง หรือลากจุดมุมเพื่อปรับขนาด</span></div><label>ขนาด <input type="range" min="0.6" max="1.7" step="0.05" value={boundedStampScale(document.stampScale || defaultStampScale)} onChange={(event) => updateStampTransform({ position: document.stampPosition || defaultStampPosition, scale: Number(event.target.value) })} /><output>{Math.round(boundedStampScale(document.stampScale || defaultStampScale) * 100)}%</output></label><button type="button" onClick={resetStampTransform}>จัดวางใหม่</button></div>}
-              {profileQuery.data && <button type="button" className="apply-template-button" data-preview-highlight="company" onClick={applySavedCompany}>ใช้ template บริษัทที่บันทึก</button>}
+              {profileQuery.data && <div className="company-design-actions" data-preview-highlight="document"><button type="button" className="apply-template-button" onClick={applySavedCompany}>ใช้ template บริษัทที่บันทึก</button><button type="button" className="save-company-design-button" onClick={saveCurrentDesignAsCompanyDefault} disabled={saveCompanyDesign.isPending}><Save size={15} /> {saveCompanyDesign.isPending ? "กำลังบันทึก..." : "ตั้งเป็นค่าเริ่มต้นบริษัท"}</button></div>}
               <p className="design-hint">แนะนำ: ใช้ไฟล์ PNG พื้นหลังโปร่งใสสำหรับลายเซ็นและตรายาง ขนาดไม่เกิน 500 KB เพื่อให้ดูคมชัดใน PDF</p>
               <button type="button" className="design-preview-link" onClick={scrollToPreview}><Eye size={15} /> ดูตัวอย่างที่อัปเดต</button>
             </section>
@@ -536,7 +572,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
 
           <aside ref={previewColumnRef} className="document-preview-column">
             <div className="preview-toolbar print-hide"><span><Info size={15} /> ตัวอย่างเอกสาร</span><div className="preview-toolbar-actions"><button type="button" className={`preview-highlight-toggle ${isPreviewHighlightEnabled ? "is-active" : ""}`} aria-pressed={isPreviewHighlightEnabled} onClick={() => setIsPreviewHighlightEnabled((enabled) => !enabled)} title={isPreviewHighlightEnabled ? "ปิดเอฟเฟกต์ไฮไลท์" : "เปิดเอฟเฟกต์ไฮไลท์"}>{isPreviewHighlightEnabled ? <Eye size={15} /> : <EyeOff size={15} />} <span>ไฮไลท์</span></button><div className="preview-zoom-controls" role="group" aria-label="ปรับขนาดตัวอย่างเอกสาร"><button type="button" onClick={() => updatePreviewZoom(previewZoom - 1)} disabled={previewZoom === -1} aria-label="ซูมออก" title="ซูมออก"><ZoomOut size={15} /></button><output className="preview-zoom-percentage" aria-live="polite" aria-label={`ระดับซูมปัจจุบัน ${previewZoomLabel}`}>{previewZoomLabel}</output><button type="button" onClick={() => updatePreviewZoom(previewZoom + 1)} disabled={previewZoom === 1} aria-label="ซูมเข้า" title="ซูมเข้า"><ZoomIn size={15} /></button><button type="button" className="zoom-reset-button" onClick={resetPreviewView} disabled={previewZoom === 0} aria-label="รีเซ็ตขนาดตัวอย่าง" title="รีเซ็ตขนาด"><RotateCcw size={14} /></button></div><AlertDialog><AlertDialogTrigger asChild><button type="button" className="zoom-storage-reset-button" aria-label="ล้างค่าซูมที่จำไว้สำหรับอุปกรณ์นี้" title="ล้างค่าซูมที่จำไว้"><RotateCcw size={14} /> ล้างค่าซูม</button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ล้างค่าซูมที่จำไว้?</AlertDialogTitle><AlertDialogDescription>การดำเนินการนี้จะคืนตัวอย่าง{meta.title}บน{previewZoomDevice === "mobile" ? "มือถือ" : "คอมพิวเตอร์"}เครื่องนี้เป็น 100% โดยไม่กระทบเอกสารหรืออุปกรณ์อื่น</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>ยกเลิก</AlertDialogCancel><AlertDialogAction onClick={resetSavedPreviewZoom}>ล้างค่าซูม</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><AlertDialog><AlertDialogTrigger asChild><button type="button" className="zoom-storage-reset-all-button" aria-label="ล้างค่าซูมทุกเอกสารบนอุปกรณ์นี้" title="ล้างค่าซูมทุกเอกสาร"><RotateCcw size={14} /> ล้างทั้งหมด</button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ล้างค่าซูมทุกเอกสาร?</AlertDialogTitle><AlertDialogDescription>การดำเนินการนี้จะล้างค่าซูมที่จำไว้ของเอกสารทุกประเภทบน{previewZoomDevice === "mobile" ? "มือถือ" : "คอมพิวเตอร์"}เครื่องนี้ และคืนตัวอย่างปัจจุบันเป็น 100% โดยไม่กระทบค่าบนอุปกรณ์อื่น</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>ยกเลิก</AlertDialogCancel><AlertDialogAction onClick={resetAllSavedPreviewZooms}>ล้างทุกเอกสาร</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><button type="button" onClick={requestPdfExport} disabled={isExporting}><Download size={15} /> {isExporting ? "กำลังสร้าง" : "PDF"}</button></div></div>
-            <div className={`preview-paper-wrap ${previewZoom === 1 ? "preview-pan-enabled" : ""} ${isPreviewResetAnimating ? "is-zoom-resetting" : ""}`} tabIndex={0} aria-label="ตัวอย่างเอกสาร รองรับการถ่างหรือหุบนิ้วเพื่อซูมบนมือถือ" onTouchStart={handlePreviewTouchStart} onTouchMove={handlePreviewTouchMove} onTouchEnd={handlePreviewTouchEnd} onTouchCancel={clearPreviewTouch}>{previewScrollIndicator && <div className="document-scroll-indicator print-hide" aria-live="polite"><span>กำลังดู</span><strong>{previewScrollIndicator.section}</strong><div className="scroll-indicator-track" aria-hidden="true"><i style={{ left: `${previewScrollIndicator.progress}%` }} /></div></div>}<span className="pinch-zoom-hint print-hide">{previewHint}</span><DocumentPreview document={document} accentColor={accentColor} template={template} screenZoom={previewZoom} screenPan={previewPan} activeHighlight={isPreviewHighlightEnabled ? activePreviewHighlight : null} isStampEditable={Boolean(document.stampUrl)} onStampTransformChange={updateStampTransform} /></div>
+            <div className={`preview-paper-wrap ${previewZoom === 1 ? "preview-pan-enabled" : ""} ${isPreviewResetAnimating ? "is-zoom-resetting" : ""}`} tabIndex={0} aria-label="ตัวอย่างเอกสาร รองรับการถ่างหรือหุบนิ้วเพื่อซูมบนมือถือ" onTouchStart={handlePreviewTouchStart} onTouchMove={handlePreviewTouchMove} onTouchEnd={handlePreviewTouchEnd} onTouchCancel={clearPreviewTouch}>{previewScrollIndicator && <div className="document-scroll-indicator print-hide" aria-live="polite"><span>กำลังดู</span><strong>{previewScrollIndicator.section}</strong><div className="scroll-indicator-track" aria-hidden="true"><i style={{ left: `${previewScrollIndicator.progress}%` }} /></div></div>}<span className="pinch-zoom-hint print-hide">{previewHint}</span><DocumentPreview document={document} accentColor={accentColor} template={template} fontFamily={fontFamily} fontSize={fontSize} screenZoom={previewZoom} screenPan={previewPan} activeHighlight={isPreviewHighlightEnabled ? activePreviewHighlight : null} isStampEditable={Boolean(document.stampUrl)} onStampTransformChange={updateStampTransform} /></div>
             <div className="convert-card print-hide"><div><FilePlus2 size={20} /><span><strong>ทำเอกสารต่อเนื่อง</strong><small>นำข้อมูลชุดนี้ไปสร้างเอกสารถัดไปได้ทันที</small></span></div><div className="convert-buttons">{convertTargets[kind].map((target) => <button type="button" key={target} onClick={() => handleConvert(target)}>{documentMeta[target].title}<ArrowRight size={14} /></button>)}</div></div>
           </aside>
         </div>
