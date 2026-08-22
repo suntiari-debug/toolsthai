@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountToThaiWords, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampScale, calculateDocumentTotals, convertDocument, createInitialDocument, restoreDocument } from "./document";
+import { amountToThaiWords, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampRotation, boundedStampScale, calculateDocumentTotals, convertDocument, createInitialDocument, restoreDocument } from "./document";
 
 describe("document calculations", () => {
   it("calculates an excluded VAT document with discount", () => {
@@ -40,6 +40,9 @@ describe("document calculations", () => {
     expect(boundedStampPosition({ x: 52.34, y: 46.66 })).toEqual({ x: 52.3, y: 46.7 });
     expect(boundedStampScale(.1)).toBe(.6);
     expect(boundedStampScale(2.5)).toBe(1.7);
+    expect(boundedStampRotation(-90)).toBe(-35);
+    expect(boundedStampRotation(90)).toBe(35);
+    expect(boundedStampRotation(12.4)).toBe(12.4);
   });
 
   it("limits logo crop, scale, and position to the printable header range", () => {
@@ -73,6 +76,7 @@ describe("document calculations", () => {
     quotation.signerPosition = "กรรมการผู้จัดการ";
     quotation.stampPosition = { x: 60, y: 44 };
     quotation.stampScale = 1.35;
+    quotation.stampRotation = 12;
     quotation.items = [{ id: "item-1", name: "บริการออกแบบ", description: "งานเดือนสิงหาคม", quantity: 2, unit: "ชั่วโมง", unitPrice: 1500 }];
     const targets = [
       ["invoice", "IV"],
@@ -93,6 +97,7 @@ describe("document calculations", () => {
       expect(converted.signerPosition).toBe("กรรมการผู้จัดการ");
       expect(converted.stampPosition).toEqual({ x: 60, y: 44 });
       expect(converted.stampScale).toBe(1.35);
+      expect(converted.stampRotation).toBe(12);
     }
   });
 
@@ -106,6 +111,7 @@ describe("document calculations", () => {
     quotation.signerPosition = "กรรมการผู้จัดการ";
     quotation.stampPosition = { x: 60, y: 44 };
     quotation.stampScale = 1.35;
+    quotation.stampRotation = -12;
     quotation.items = [{ id: "item-2", name: "บริการรายเดือน", description: "สิงหาคม", quantity: 1, unit: "เดือน", unitPrice: 2500 }];
     const converted = convertDocument(quotation, "receipt");
     const restored = restoreDocument(JSON.stringify(converted), "receipt");
@@ -117,5 +123,6 @@ describe("document calculations", () => {
     expect(restored.signerPosition).toBe("กรรมการผู้จัดการ");
     expect(restored.stampPosition).toEqual({ x: 60, y: 44 });
     expect(restored.stampScale).toBe(1.35);
+    expect(restored.stampRotation).toBe(-12);
   });
 });

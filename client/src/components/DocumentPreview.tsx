@@ -1,5 +1,5 @@
 import { type CSSProperties, useRef } from "react";
-import { BusinessDocument, StampPosition, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampScale, calculateDocumentTotals, defaultLogoPosition, defaultLogoScale, defaultStampPosition, defaultStampScale, documentMeta, formatNumber, formatTHB, formatThaiDate, amountToThaiWords } from "@/lib/document";
+import { BusinessDocument, StampPosition, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampRotation, boundedStampScale, calculateDocumentTotals, defaultLogoPosition, defaultLogoScale, defaultStampPosition, defaultStampRotation, defaultStampScale, documentMeta, formatNumber, formatTHB, formatThaiDate, amountToThaiWords } from "@/lib/document";
 import { normalizeDocumentFontFamily, normalizeDocumentFontSize, type DocumentFontFamily, type DocumentFontSize } from "@/lib/documentDesign";
 import type { PreviewHighlightTarget } from "@/lib/previewHighlight";
 import type { PreviewPan } from "@/lib/previewZoom";
@@ -14,7 +14,7 @@ type DocumentPreviewProps = {
   screenPan?: PreviewPan;
   activeHighlight?: PreviewHighlightTarget | null;
   isStampEditable?: boolean;
-  onStampTransformChange?: (transform: { position: StampPosition; scale: number }) => void;
+  onStampTransformChange?: (transform: { position: StampPosition; scale: number; rotation: number }) => void;
 };
 
 export default function DocumentPreview({ document, accentColor = "#0d7a75", template = "classic", fontFamily, fontSize, screenZoom = 0, screenPan = { x: 0, y: 0 }, activeHighlight = null, isStampEditable = false, onStampTransformChange }: DocumentPreviewProps) {
@@ -22,9 +22,10 @@ export default function DocumentPreview({ document, accentColor = "#0d7a75", tem
   const meta = documentMeta[document.kind];
   const zoomClass = screenZoom === -1 ? "preview-zoom-out" : screenZoom === 1 ? "preview-zoom-in" : "preview-zoom-default";
   const stampArtworkRef = useRef<HTMLDivElement>(null);
-  const stampPointer = useRef<{ action: "move" | "resize"; clientX: number; clientY: number; position: StampPosition; scale: number } | null>(null);
+  const stampPointer = useRef<{ action: "move" | "resize"; clientX: number; clientY: number; position: StampPosition; scale: number; rotation: number } | null>(null);
   const stampPosition = boundedStampPosition(document.stampPosition || defaultStampPosition);
   const stampScale = boundedStampScale(document.stampScale || defaultStampScale);
+  const stampRotation = boundedStampRotation(document.stampRotation ?? defaultStampRotation);
   const logoPosition = boundedLogoPosition(document.logoPosition || defaultLogoPosition);
   const logoScale = boundedLogoScale(document.logoScale || defaultLogoScale);
   const logoCrop = boundedLogoCrop(document.logoCrop);
@@ -36,7 +37,7 @@ export default function DocumentPreview({ document, accentColor = "#0d7a75", tem
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
-    stampPointer.current = { action, clientX: event.clientX, clientY: event.clientY, position: stampPosition, scale: stampScale };
+    stampPointer.current = { action, clientX: event.clientX, clientY: event.clientY, position: stampPosition, scale: stampScale, rotation: stampRotation };
   };
   const moveStampPointer = (event: React.PointerEvent<HTMLButtonElement>) => {
     const interaction = stampPointer.current;
@@ -47,11 +48,11 @@ export default function DocumentPreview({ document, accentColor = "#0d7a75", tem
     const rect = area.getBoundingClientRect();
     if (interaction.action === "move") {
       const position = boundedStampPosition({ x: interaction.position.x + ((event.clientX - interaction.clientX) / rect.width) * 100, y: interaction.position.y + ((event.clientY - interaction.clientY) / rect.height) * 100 });
-      onStampTransformChange({ position, scale: interaction.scale });
+      onStampTransformChange({ position, scale: interaction.scale, rotation: interaction.rotation });
       return;
     }
     const scale = boundedStampScale(interaction.scale + ((event.clientX - interaction.clientX) / rect.width) * 2.2);
-    onStampTransformChange({ position: interaction.position, scale });
+    onStampTransformChange({ position: interaction.position, scale, rotation: interaction.rotation });
   };
   const endStampPointer = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (!stampPointer.current) return;
@@ -89,7 +90,7 @@ export default function DocumentPreview({ document, accentColor = "#0d7a75", tem
         <div className={`pdf-note${highlightClass("note")}`} data-preview-region="note"><span className="pdf-section-label">จำนวนเงิน (ตัวอักษร)</span><p className="pdf-amount-words">{amountToThaiWords(totals.total)}</p><span className="pdf-section-label note-label">หมายเหตุ</span><p>{document.note || "—"}</p></div>
         <div className={`pdf-totals${highlightClass("totals")}`} data-preview-region="totals"><div><span>มูลค่าสินค้า / บริการ</span><strong>{formatTHB(totals.subtotal)}</strong></div>{totals.discount > 0 && <div><span>ส่วนลด</span><strong>-{formatTHB(totals.discount)}</strong></div>}{document.vatMode !== "none" && <div><span>ภาษีมูลค่าเพิ่ม {document.vatRate}%</span><strong>{formatTHB(totals.vat)}</strong></div>}<div className="pdf-grand-total"><span>ยอดสุทธิ (บาท)</span><strong>{formatTHB(totals.total)}</strong></div></div>
       </section>
-      <footer className={`pdf-signatures${highlightClass("signature")}`} data-preview-region="signature"><div className="pdf-signature-recipient"><div className="pdf-signature-artwork" /><i /><span>ผู้รับเอกสาร / ลูกค้า</span><small>วันที่ ____/____/____</small></div><div className="pdf-signature-company"><div className="pdf-signature-artwork" ref={stampArtworkRef}>{document.signatureUrl && <img className="pdf-signature-image" src={document.signatureUrl} alt="ลายเซ็นผู้มีอำนาจ" />}{document.stampUrl && <div className={`pdf-stamp-wrapper ${isStampEditable ? "is-editable" : ""}`} style={{ "--stamp-x": `${stampPosition.x}%`, "--stamp-y": `${stampPosition.y}%`, "--stamp-scale": String(stampScale) } as CSSProperties}><img className="pdf-stamp-image" src={document.stampUrl} alt="ตรายางบริษัท" /><button type="button" className="stamp-drag-handle" aria-label="ลากย้ายตรายาง" onPointerDown={(event) => startStampPointer(event, "move")} onPointerMove={moveStampPointer} onPointerUp={endStampPointer} onPointerCancel={endStampPointer} onTouchStart={(event) => event.stopPropagation()} onTouchMove={(event) => event.stopPropagation()} data-html2canvas-ignore="true">ลาก</button><button type="button" className="stamp-resize-handle" aria-label="ลากปรับขนาดตรายาง" onPointerDown={(event) => startStampPointer(event, "resize")} onPointerMove={moveStampPointer} onPointerUp={endStampPointer} onPointerCancel={endStampPointer} onTouchStart={(event) => event.stopPropagation()} onTouchMove={(event) => event.stopPropagation()} data-html2canvas-ignore="true" /></div>}</div><i /><span>{document.signerName || "ผู้มีอำนาจลงนาม"}</span>{document.signerPosition && <em className="pdf-signer-position">{document.signerPosition}</em>}<small>วันที่ ____/____/____</small></div></footer>
+      <footer className={`pdf-signatures${highlightClass("signature")}`} data-preview-region="signature"><div className="pdf-signature-recipient"><div className="pdf-signature-artwork" /><i /><span>ผู้รับเอกสาร / ลูกค้า</span><small>วันที่ ____/____/____</small></div><div className="pdf-signature-company"><div className="pdf-signature-artwork" ref={stampArtworkRef}>{document.signatureUrl && <img className="pdf-signature-image" src={document.signatureUrl} alt="ลายเซ็นผู้มีอำนาจ" />}{document.stampUrl && <div className={`pdf-stamp-wrapper ${isStampEditable ? "is-editable" : ""}`} style={{ "--stamp-x": `${stampPosition.x}%`, "--stamp-y": `${stampPosition.y}%`, "--stamp-scale": String(stampScale), "--stamp-rotation": `${stampRotation}deg` } as CSSProperties}><img className="pdf-stamp-image" src={document.stampUrl} alt="ตรายางบริษัท" /><button type="button" className="stamp-drag-handle" aria-label="ลากย้ายตรายาง" onPointerDown={(event) => startStampPointer(event, "move")} onPointerMove={moveStampPointer} onPointerUp={endStampPointer} onPointerCancel={endStampPointer} onTouchStart={(event) => event.stopPropagation()} onTouchMove={(event) => event.stopPropagation()} data-html2canvas-ignore="true">ลาก</button><button type="button" className="stamp-resize-handle" aria-label="ลากปรับขนาดตรายาง" onPointerDown={(event) => startStampPointer(event, "resize")} onPointerMove={moveStampPointer} onPointerUp={endStampPointer} onPointerCancel={endStampPointer} onTouchStart={(event) => event.stopPropagation()} onTouchMove={(event) => event.stopPropagation()} data-html2canvas-ignore="true" /></div>}</div><i /><span>{document.signerName || "ผู้มีอำนาจลงนาม"}</span>{document.signerPosition && <em className="pdf-signer-position">{document.signerPosition}</em>}<small>วันที่ ____/____/____</small></div></footer>
     </article>
   );
 }

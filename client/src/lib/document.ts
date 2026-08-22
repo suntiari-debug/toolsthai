@@ -12,6 +12,7 @@ export type LineItem = {
 export type StampPosition = { x: number; y: number };
 export const defaultStampPosition: StampPosition = { x: 78, y: 72 };
 export const defaultStampScale = 1;
+export const defaultStampRotation = 0;
 
 export type LogoPosition = { x: number; y: number };
 export type LogoCrop = { zoom: number; x: number; y: number; brightness: number; contrast: number };
@@ -49,6 +50,10 @@ export function boundedStampScale(scale: number) {
   return Math.round(Math.min(1.7, Math.max(.6, Number(scale) || defaultStampScale)) * 100) / 100;
 }
 
+export function boundedStampRotation(rotation: number) {
+  return boundedValue(rotation, -35, 35, defaultStampRotation);
+}
+
 export type BusinessDocument = {
   kind: DocumentKind;
   documentNumber: string;
@@ -79,6 +84,7 @@ export type BusinessDocument = {
   stampUrl?: string;
   stampPosition?: StampPosition;
   stampScale?: number;
+  stampRotation?: number;
   logoPosition?: LogoPosition;
   logoScale?: number;
   logoCrop?: LogoCrop;
@@ -136,6 +142,7 @@ export function createInitialDocument(kind: DocumentKind): BusinessDocument {
     stampUrl: "",
     stampPosition: { ...defaultStampPosition },
     stampScale: defaultStampScale,
+    stampRotation: defaultStampRotation,
     logoPosition: { ...defaultLogoPosition },
     logoScale: defaultLogoScale,
     logoCrop: { ...defaultLogoCrop },
@@ -169,6 +176,7 @@ export function restoreDocument(payload: string, activeKind: DocumentKind): Busi
     stampUrl: document.stampUrl || "",
     stampPosition: boundedStampPosition(document.stampPosition || defaultStampPosition),
     stampScale: boundedStampScale(document.stampScale || defaultStampScale),
+    stampRotation: boundedStampRotation(document.stampRotation ?? defaultStampRotation),
     logoPosition: boundedLogoPosition(document.logoPosition || defaultLogoPosition),
     logoScale: boundedLogoScale(document.logoScale || defaultLogoScale),
     logoCrop: boundedLogoCrop(document.logoCrop),
