@@ -216,8 +216,14 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     const validation = validateDocumentAssetFile(file, label);
     if (!validation.valid) { flashNotice(validation.message); return; }
     if (!file) return;
+    if (document[field]?.startsWith("blob:")) URL.revokeObjectURL(document[field]);
     updateDocument(field, URL.createObjectURL(file));
     event.target.value = "";
+  };
+  const removeDocumentAsset = (field: "signatureUrl" | "stampUrl", label: string) => {
+    if (document[field]?.startsWith("blob:")) URL.revokeObjectURL(document[field]);
+    updateDocument(field, "");
+    flashNotice(`ลบ${label}ออกจากเอกสารนี้แล้ว`);
   };
 
   const handlePdfExport = async () => {
@@ -302,8 +308,8 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
               <div className="accent-picker" aria-label="เลือกสีหลักของเอกสาร">{accentChoices.map((color) => <button type="button" key={color} className={accentColor === color ? "is-selected" : ""} onClick={() => setAccentColor(color)} style={{ backgroundColor: color }} aria-label={`เลือกสี ${color}`} />)}</div>
               <div className="document-assets-row">
                 <label className="asset-upload-tile"><span className="asset-preview">{document.company.logoUrl ? <img src={document.company.logoUrl} alt="ตัวอย่างโลโก้" /> : <WandSparkles size={18} />}</span><strong>โลโก้</strong><span><Upload size={13} /> อัปโหลด</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogo} /></label>
-                <label className="asset-upload-tile"><span className="asset-preview">{document.signatureUrl ? <img src={document.signatureUrl} alt="ตัวอย่างลายเซ็น" /> : <WandSparkles size={18} />}</span><strong>ลายเซ็น</strong><span><Upload size={13} /> อัปโหลด</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => handleDocumentAsset(event, "signatureUrl", "ลายเซ็น")} /></label>
-                <label className="asset-upload-tile"><span className="asset-preview">{document.stampUrl ? <img src={document.stampUrl} alt="ตัวอย่างตรายาง" /> : <WandSparkles size={18} />}</span><strong>ตรายาง</strong><span><Upload size={13} /> อัปโหลด</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => handleDocumentAsset(event, "stampUrl", "ตรายาง")} /></label>
+                <DocumentAssetTile label="ลายเซ็น" previewUrl={document.signatureUrl || ""} onChange={(event) => handleDocumentAsset(event, "signatureUrl", "ลายเซ็น")} onRemove={() => removeDocumentAsset("signatureUrl", "ลายเซ็น")} />
+                <DocumentAssetTile label="ตรายาง" previewUrl={document.stampUrl || ""} onChange={(event) => handleDocumentAsset(event, "stampUrl", "ตรายาง")} onRemove={() => removeDocumentAsset("stampUrl", "ตรายาง")} />
               </div>
               {profileQuery.data && <button type="button" className="apply-template-button" onClick={applySavedCompany}>ใช้ template บริษัทที่บันทึก</button>}
               <p className="design-hint">แนะนำ: ใช้ไฟล์ PNG พื้นหลังโปร่งใสสำหรับลายเซ็นและตรายาง ขนาดไม่เกิน 500 KB เพื่อให้ดูคมชัดใน PDF</p>
@@ -366,4 +372,5 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
 
 function FormField({ label, children }: { label: string; children: React.ReactNode }) { return <label className="form-field"><span>{label}</span>{children}</label>; }
 function CardHeading({ title }: { title: string }) { return <div className="card-heading"><h2>{title}</h2></div>; }
+function DocumentAssetTile({ label, previewUrl, onChange, onRemove }: { label: string; previewUrl: string; onChange: (event: ChangeEvent<HTMLInputElement>) => void; onRemove: () => void }) { return <div className="asset-upload-tile"><span className="asset-preview">{previewUrl ? <img src={previewUrl} alt={`ตัวอย่าง${label}`} /> : <WandSparkles size={18} />}</span><strong>{label}</strong><label className="asset-upload-action"><Upload size={13} /> {previewUrl ? "เปลี่ยนรูป" : "อัปโหลด"}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={onChange} /></label>{previewUrl && <button type="button" className="asset-remove-button" onClick={onRemove}>ลบรูป</button>}</div>; }
 function getTouchDistance(touches: TouchEvent<HTMLDivElement>["touches"]) { return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY); }
