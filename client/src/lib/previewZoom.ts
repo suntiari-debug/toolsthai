@@ -1,0 +1,68 @@
+export type PreviewZoom = -1 | 0 | 1;
+export type PreviewPan = { x: number; y: number };
+export type PreviewScrollIndicator = { section: "ส่วนบน" | "ส่วนกลาง" | "ส่วนล่าง"; progress: number };
+export type TapPoint = { x: number; y: number; timestamp: number };
+export type PreviewZoomDevice = "mobile" | "desktop";
+export const previewZoomDocumentKinds = ["quotation", "invoice", "receipt", "delivery-note", "tax-invoice"] as const;
+
+export function boundedPreviewZoom(value: number): PreviewZoom {
+  if (value >= 1) return 1;
+  if (value <= -1) return -1;
+  return 0;
+}
+
+export function parseStoredPreviewZoom(value: string | null): PreviewZoom {
+  if (value === "-1") return -1;
+  if (value === "1") return 1;
+  return 0;
+}
+
+export function getPreviewZoomDevice(viewportWidth: number): PreviewZoomDevice {
+  return viewportWidth <= 820 ? "mobile" : "desktop";
+}
+
+export function getPreviewZoomStorageKey(documentKind: string, device: PreviewZoomDevice): string {
+  return `toolsthai.preview-zoom.${documentKind}.${device}`;
+}
+
+export function getAllPreviewZoomStorageKeys(device: PreviewZoomDevice): string[] {
+  return previewZoomDocumentKinds.map((documentKind) => getPreviewZoomStorageKey(documentKind, device));
+}
+
+export function getLegacyPreviewZoomStorageKey(documentKind: string): string {
+  return `toolsthai.preview-zoom.${documentKind}`;
+}
+
+export function pinchZoomStep(startDistance: number, currentDistance: number, startZoom: PreviewZoom): PreviewZoom {
+  if (!Number.isFinite(startDistance) || !Number.isFinite(currentDistance) || startDistance <= 0 || currentDistance <= 0) return startZoom;
+  const ratio = currentDistance / startDistance;
+  if (ratio >= 1.15) return boundedPreviewZoom(startZoom + 1);
+  if (ratio <= 0.87) return boundedPreviewZoom(startZoom - 1);
+  return startZoom;
+}
+
+export function clampPreviewPan(pan: PreviewPan, limit: PreviewPan): PreviewPan {
+  return {
+    x: Math.min(0, Math.max(-Math.abs(limit.x), pan.x)),
+    y: Math.min(0, Math.max(-Math.abs(limit.y), pan.y)),
+  };
+}
+
+export function getPreviewScrollIndicator(panY: number, limitY: number): PreviewScrollIndicator {
+  const safeLimit = Math.max(1, Math.abs(limitY));
+  const progress = Math.round(Math.min(1, Math.max(0, Math.abs(panY) / safeLimit)) * 100);
+  if (progress < 34) return { section: "ส่วนบน", progress };
+  if (progress < 67) return { section: "ส่วนกลาง", progress };
+  return { section: "ส่วนล่าง", progress };
+}
+
+export function getPreviewScrollBehavior(prefersReducedMotion: boolean): ScrollBehavior {
+  return prefersReducedMotion ? "auto" : "smooth";
+}
+
+export function isDoubleTap(previous: TapPoint | null, current: TapPoint, maxDelay = 280, maxDistance = 32): boolean {
+  if (!previous) return false;
+  const delay = current.timestamp - previous.timestamp;
+  const distance = Math.hypot(current.x - previous.x, current.y - previous.y);
+  return delay >= 0 && delay <= maxDelay && distance <= maxDistance;
+}

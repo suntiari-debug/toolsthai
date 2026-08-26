@@ -4,32 +4,38 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import ComingSoon from "./pages/ComingSoon";
+import CalculatorTool from "./pages/CalculatorTool";
+import Account from "./pages/Account";
+import DocumentTool from "./pages/DocumentTool";
 import Home from "./pages/Home";
+import ToolDirectory from "./pages/ToolDirectory";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
+      <Route path="/" component={Home} />
+      <Route path="/tools" component={ToolDirectory} />
+      <Route path="/account" component={Account} />
+      <Route path="/quotation">{() => <DocumentTool kind="quotation" />}</Route>
+      <Route path="/invoice">{() => <DocumentTool kind="invoice" />}</Route>
+      <Route path="/receipt">{() => <DocumentTool kind="receipt" />}</Route>
+      <Route path="/delivery-note">{() => <DocumentTool kind="delivery-note" />}</Route>
+      <Route path="/tax-invoice">{() => <DocumentTool kind="tax-invoice" />}</Route>
+      <Route path="/pricing-calculator">{() => <CalculatorTool kind="pricing" />}</Route>
+      <Route path="/vat-calculator">{() => <CalculatorTool kind="vat" />}</Route>
+      <Route path="/margin-calculator">{() => <CalculatorTool kind="margin" />}</Route>
+      <Route path="/payment-terms">{() => <CalculatorTool kind="payment-terms" />}</Route>
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
-function App() {
+export default function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
           <Router />
@@ -38,5 +44,3 @@ function App() {
     </ErrorBoundary>
   );
 }
-
-export default App;

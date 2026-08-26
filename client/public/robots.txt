@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+# The server generates the absolute Sitemap URL from PUBLIC_SITE_URL.

@@ -1,0 +1,39 @@
+import { trpc } from "@/lib/trpc";
+import { COOKIE_NAME, UNAUTHED_ERR_MSG } from "@shared/const";
+import { HydrationBoundary, QueryClient, QueryClientProvider, type DehydratedState } from "@tanstack/react-query";
+import { httpBatchLink, TRPCClientError } from "@trpc/client";
+import { createRoot, hydrateRoot } from "react-dom/client";
+import superjson from "superjson";
+import { Router } from "wouter";
+import App from "./App";
+import { startLogin } from "./const";
+import "./index.css";
+
+declare global { interface Window { __RQ_STATE__?: unknown; __SSR_RENDERED__?: boolean; } }
+
+function loadAnalytics() {
+  const endpoint = import.meta.env.VITE_ANALYTICS_ENDPOINT?.trim();
+  const websiteId = import.meta.env.VITE_ANALYTICS_WEBSITE_ID?.trim();
+  if (!endpoint || !websiteId || endpoint.includes("%VITE_")) return;
+
+  try {
+    const script = document.createElement("script");
+    script.defer = true;
+    script.src = `${endpoint.replace(/\/+$/, "")}/umami`;
+    script.dataset.websiteId = websiteId;
+    document.body.appendChild(script);
+  } catch {
+    // Analytics must never block the primary application flow.
+  }
+}
+
+loadAnalytics();
+const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } });
+const redirectToLoginIfUnauthorized = (error: unknown) => { if (error instanceof TRPCClientError && error.message === UNAUTHED_ERR_MSG) startLogin(); };
+queryClient.getQueryCache().subscribe((event) => { if (event.type === "updated" && event.action.type === "error") { redirectToLoginIfUnauthorized(event.query.state.error); console.error("[API Query Error]", event.query.state.error); } });
+queryClient.getMutationCache().subscribe((event) => { if (event.type === "updated" && event.action.type === "error") { redirectToLoginIfUnauthorized(event.mutation.state.error); console.error("[API Mutation Error]", event.mutation.state.error); } });
+const trpcClient = trpc.createClient({ links: [httpBatchLink({ url: "/api/trpc", transformer: superjson, headers() { try { const raw = sessionStorage.getItem("manus-cookie"); const prefix = `${COOKIE_NAME}=`; const pair = raw?.split(";").find((value) => value.trim().startsWith(prefix)); const token = pair?.trim().slice(prefix.length); return token ? { Authorization: `Bearer ${token}` } : {}; } catch { return {}; } }, fetch(input, init) { return globalThis.fetch(input, { ...(init ?? {}), credentials: "include" }); } })] });
+const state = window.__RQ_STATE__ ? superjson.deserialize(window.__RQ_STATE__ as Parameters<typeof superjson.deserialize>[0]) as DehydratedState : undefined;
+const tree = <trpc.Provider client={trpcClient} queryClient={queryClient}><QueryClientProvider client={queryClient}><HydrationBoundary state={state}><Router><App /></Router></HydrationBoundary></QueryClientProvider></trpc.Provider>;
+const root = document.getElementById("root")!;
+if (window.__SSR_RENDERED__) hydrateRoot(root, tree); else createRoot(root).render(tree);
