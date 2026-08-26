@@ -57,6 +57,16 @@
   background: var(--teal-dark);
 }
 
+.pdf-export-overlay { position: fixed; z-index: 90; inset: 0; display: grid; place-items: center; padding: 1.25rem; background: rgba(7, 29, 31, .48); backdrop-filter: blur(7px); }
+.pdf-export-dialog { width: min(100%, 27rem); overflow: hidden; border: 1px solid rgba(255, 255, 255, .32); border-radius: 1.25rem; background: linear-gradient(145deg, #fffcf6, #f1f7f3); box-shadow: 0 1.5rem 4.5rem rgba(3, 22, 23, .34); }
+.pdf-export-orbit { position: relative; display: grid; width: 5rem; height: 5rem; place-items: center; margin: 2rem auto 1.1rem; border: 1px solid rgba(13, 110, 114, .17); border-radius: 50%; color: var(--teal); background: #e3f3ed; }
+.pdf-export-orbit::before { position: absolute; inset: -.35rem; border: 1px dashed rgba(13, 110, 114, .35); border-radius: inherit; content: ""; animation: pdf-orbit 6s linear infinite; }
+.pdf-export-orbit svg { animation: pdf-spin 1.3s linear infinite; }.pdf-export-orbit span { position: absolute; padding: .12rem .28rem; border-radius: .25rem; color: #fff; background: var(--teal); font-family: "DM Mono", monospace; font-size: .48rem; font-weight: 800; letter-spacing: .06em; }
+.pdf-export-copy { padding: 0 2rem 1.4rem; text-align: center; }.pdf-export-copy p { margin: 0 0 .35rem; color: var(--teal); font-family: "DM Mono", monospace; font-size: .62rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }.pdf-export-copy h2 { margin: 0; color: var(--ink); font-size: 1.35rem; letter-spacing: -.04em; }.pdf-export-copy > span { display: block; margin-top: .4rem; color: #687875; font-size: .76rem; }
+.pdf-export-steps { display: grid; gap: .72rem; margin: 0; padding: 1.1rem 1.35rem 1.35rem; border-top: 1px solid rgba(13, 110, 114, .11); background: rgba(255, 255, 255, .64); list-style: none; }.pdf-export-steps li { display: flex; align-items: center; gap: .55rem; color: #91a09d; font-size: .73rem; font-weight: 650; }.pdf-export-steps i { display: grid; width: 1.15rem; height: 1.15rem; place-items: center; border: 1px solid #c9d8d3; border-radius: 50%; font-style: normal; font-size: .6rem; }.pdf-export-steps svg { color: #13856e; }.pdf-export-steps .is-active { color: var(--ink); }.pdf-export-steps .is-active i { border-color: var(--teal); color: #fff; background: var(--teal); box-shadow: 0 0 0 4px rgba(13, 110, 114, .12); }.pdf-export-steps .is-complete { color: #226956; }
+@keyframes pdf-spin { to { transform: rotate(360deg); } } @keyframes pdf-orbit { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pdf-export-orbit::before, .pdf-export-orbit svg { animation: none; } }
+
 .document-tool-page .template-choice.is-selected {
   border-color: var(--teal);
   box-shadow: 0 0 0 2px rgba(13, 110, 114, .15);
@@ -87,3 +97,5 @@ body .calculator-result-card {
     border-radius: .9rem;
   }
 }
+
+@media (max-width: 500px) { .pdf-export-dialog { border-radius: 1rem; }.pdf-export-orbit { margin-top: 1.55rem; }.pdf-export-copy { padding-right: 1.2rem; padding-left: 1.2rem; }.pdf-export-steps { padding-right: 1.1rem; padding-left: 1.1rem; } }

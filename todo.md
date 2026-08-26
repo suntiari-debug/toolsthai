@@ -32,3 +32,10 @@
 - [x] แก้ client-only หรือ non-deterministic render ในหน้าใบเสนอราคาและเพิ่ม regression coverage
 - [x] ตรวจ TypeScript, SSR, runtime และ Browser console หลังแก้ hydration mismatch
 - [x] บันทึก checkpoint และสรุปการแก้ hydration mismatch
+- [x] ตรวจ workflow PDF export และจุดแสดงสถานะปัจจุบัน
+- [x] เพิ่ม loading overlay แบบ animated พร้อมข้อความความคืบหน้าระหว่างสร้าง PDF
+- [x] เพิ่ม Vitest สำหรับ state/ข้อความ loading ของ PDF export และตรวจ TypeScript, build, visual preview
+- [x] รวม PDF export lifecycle ที่ DocumentTool ใช้จริงและทดสอบการเปลี่ยนสถานะ/ปิด overlay เมื่อสำเร็จหรือผิดพลาด
+- [x] ยืนยัน browser-level loading overlay ของ PDF export ผ่านการจำลอง workflow ที่ไม่สร้างไฟล์ผู้ใช้จริง (production runtime แสดง "กำลังเตรียมเอกสาร", ดาวน์โหลด QT-202608-001.pdf และ overlay ปิดหลังเริ่มดาวน์โหลด)
+- [x] เพิ่ม browser verification ของ PDF overlay ใน repository และผูกคำสั่ง test:pdf-overlay เพื่อรันซ้ำได้ (กำหนด TOOLSTHAI_BROWSER_BASE_URL)
+- [x] บันทึก checkpoint และสรุป PDF loading experience

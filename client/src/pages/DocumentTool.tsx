@@ -1,6 +1,6 @@
 import { ChangeEvent, type CSSProperties, TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, ArrowRight, Download, Eye, EyeOff, FileDown, FilePlus2, Info, Plus, Printer, RotateCcw, Save, Search, ShieldCheck, Tags, Trash2, Undo2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Download, Eye, EyeOff, FileDown, FilePlus2, Info, LoaderCircle, Plus, Printer, RotateCcw, Save, Search, ShieldCheck, Tags, Trash2, Undo2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
 import PublicFooter from "@/components/PublicFooter";
 import PublicHeader from "@/components/PublicHeader";
 import DocumentPreview from "@/components/DocumentPreview";
@@ -20,11 +20,14 @@ import { businessDocumentTemplates, documentFontChoices, documentFontSizeChoices
 import { createLogoPresetExport, filterLogoPresets, LEGACY_LOGO_PRESETS_STORAGE_KEY, LOGO_PRESETS_STORAGE_KEY, logoPresetCategories, MAX_LOGO_PRESET_IMPORT_BYTES, MAX_LOGO_PRESETS, mergeLogoPresets, parseLogoPresetImport, parseStoredPreviewHighlight, PREVIEW_HIGHLIGHT_PREFERENCE_STORAGE_KEY, sanitizeLogoPresets, serializeLogoPresets, type LogoPreset, type LogoPresetCategory } from "@/lib/documentPreferences";
 import { getItemPreviewHighlightTarget, getPreviewHighlightTarget, type PreviewHighlightTarget } from "@/lib/previewHighlight";
 import { restoreDocumentResume } from "@/lib/documentCenterNavigation";
+import { getPdfExportStageIndex, pdfExportStages, runPdfExportLifecycle, type PdfExportStage } from "@/lib/pdfExportStatus";
 import "../styles/document-typography.css";
 import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollBehavior, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
 
 type DocumentToolProps = { kind: DocumentKind };
 type RemovedLogo = { logoUrl: string; position: { x: number; y: number }; scale: number; crop: NonNullable<BusinessDocument["logoCrop"]> };
+type PdfExportModules = [typeof import("html2canvas"), typeof import("jspdf")];
+type PdfDocument = InstanceType<(typeof import("jspdf"))["jsPDF"]>;
 
 const convertTargets: Record<DocumentKind, DocumentKind[]> = {
   quotation: ["invoice", "receipt", "delivery-note"],
@@ -52,7 +55,8 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const { isAuthenticated } = useAuth();
   const [document, setDocument] = useState<BusinessDocument>(() => createHydrationSeedDocument(kind));
   const [notice, setNotice] = useState("");
-  const [isExporting, setIsExporting] = useState(false);
+  const [pdfExportStage, setPdfExportStage] = useState<PdfExportStage | null>(null);
+  const isExporting = pdfExportStage !== null;
   const [previewZoom, setPreviewZoom] = useState<PreviewZoom>(0);
   const [previewPan, setPreviewPan] = useState<PreviewPan>({ x: 0, y: 0 });
   const [isPreviewZoomRestored, setIsPreviewZoomRestored] = useState(false);
@@ -406,33 +410,43 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const exportPdf = async () => {
     const printable = window.document.getElementById("printable-document");
     if (!printable || isExporting) return;
-    setIsExporting(true);
     setActivePreviewHighlight(null);
     try {
-      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
-      await window.document.fonts?.ready;
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
-      const canvas = await html2canvas(printable, { backgroundColor: "#ffffff", scale: 2.5, useCORS: true, logging: false, windowWidth: printable.scrollWidth });
-      const imageData = canvas.toDataURL("image/jpeg", 0.98);
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const imageHeight = (canvas.height * pageWidth) / canvas.width;
-      let heightLeft = imageHeight;
-      let position = 0;
-      pdf.addImage(imageData, "JPEG", 0, position, pageWidth, imageHeight, undefined, "FAST");
-      heightLeft -= pageHeight;
-      while (heightLeft > 0) {
-        position = heightLeft - imageHeight;
-        pdf.addPage();
-        pdf.addImage(imageData, "JPEG", 0, position, pageWidth, imageHeight, undefined, "FAST");
-        heightLeft -= pageHeight;
-      }
-      pdf.save(`${document.documentNumber || documentMeta[kind].prefix}.pdf`);
+      await runPdfExportLifecycle({
+        setStage: setPdfExportStage,
+        prepare: async (): Promise<PdfExportModules> => {
+          await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+          await window.document.fonts?.ready;
+          return Promise.all([import("html2canvas"), import("jspdf")]);
+        },
+        render: async ([{ default: html2canvas }, { jsPDF }]: PdfExportModules): Promise<PdfDocument> => {
+          const canvas = await html2canvas(printable, { backgroundColor: "#ffffff", scale: 2.5, useCORS: true, logging: false, windowWidth: printable.scrollWidth });
+          const imageData = canvas.toDataURL("image/jpeg", 0.98);
+          const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+          const pageWidth = 210;
+          const pageHeight = 297;
+          const imageHeight = (canvas.height * pageWidth) / canvas.width;
+          let heightLeft = imageHeight;
+          let position = 0;
+          pdf.addImage(imageData, "JPEG", 0, position, pageWidth, imageHeight, undefined, "FAST");
+          heightLeft -= pageHeight;
+          while (heightLeft > 0) {
+            position = heightLeft - imageHeight;
+            pdf.addPage();
+            pdf.addImage(imageData, "JPEG", 0, position, pageWidth, imageHeight, undefined, "FAST");
+            heightLeft -= pageHeight;
+          }
+          return pdf;
+        },
+        download: async (pdf: PdfDocument) => {
+          await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+          pdf.save(`${document.documentNumber || documentMeta[kind].prefix}.pdf`);
+          flashNotice("เริ่มดาวน์โหลดไฟล์ PDF แล้ว");
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 420));
+        },
+      });
     } catch {
       flashNotice("ไม่สามารถสร้าง PDF ได้ กรุณาลองใหม่อีกครั้ง");
-    } finally {
-      setIsExporting(false);
     }
   };
 
@@ -491,6 +505,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
           <span className="autosave-status"><span>✓</span> บันทึกอัตโนมัติในอุปกรณ์</span>
         </div>
         {notice && <div className="draft-toast print-hide"><ShieldCheck size={17} /> {notice}</div>}
+        {pdfExportStage && <div className="pdf-export-overlay print-hide" role="status" aria-live="assertive" aria-label="กำลังสร้างไฟล์ PDF"><div className="pdf-export-dialog"><div className="pdf-export-orbit"><LoaderCircle size={29} /><span>PDF</span></div><div className="pdf-export-copy"><p>กำลังจัดทำเอกสารของคุณ</p><h2>{pdfExportStages[getPdfExportStageIndex(pdfExportStage)].title}</h2><span>{pdfExportStages[getPdfExportStageIndex(pdfExportStage)].detail}</span></div><ol className="pdf-export-steps">{pdfExportStages.map((stage, index) => <li key={stage.id} className={index < getPdfExportStageIndex(pdfExportStage) ? "is-complete" : index === getPdfExportStageIndex(pdfExportStage) ? "is-active" : ""}>{index < getPdfExportStageIndex(pdfExportStage) ? <CheckCircle2 size={14} /> : <i>{index + 1}</i>}<span>{stage.title}</span></li>)}</ol></div></div>}
         <AlertDialog open={isPdfValidationOpen} onOpenChange={setIsPdfValidationOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ตรวจข้อมูลสำคัญก่อนดาวน์โหลด PDF</AlertDialogTitle><AlertDialogDescription>พบข้อมูลที่ควรตรวจทานก่อนสร้าง PDF คุณสามารถกลับไปแก้ไข หรือดาวน์โหลดต่อได้หากยืนยันว่าข้อมูลถูกต้องแล้ว</AlertDialogDescription></AlertDialogHeader><ul className="pdf-validation-list">{pdfValidationIssues.map((issue) => <li key={issue.id}><strong>{issue.label}</strong><span>{issue.message}</span></li>)}</ul><AlertDialogFooter><AlertDialogCancel>กลับไปแก้ไข</AlertDialogCancel><AlertDialogAction onClick={() => { setIsPdfValidationOpen(false); void exportPdf(); }}>ดาวน์โหลดต่อ</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
         <Dialog open={isLogoEditorOpen} onOpenChange={setIsLogoEditorOpen}><DialogContent className="logo-editor-dialog"><DialogHeader><DialogTitle>ครอปและปรับแต่งโลโก้</DialogTitle><DialogDescription>ปรับมุมมองโลโก้ก่อนใช้ในหัวเอกสาร การเปลี่ยนแปลงจะแสดงใน preview และ PDF ทันที</DialogDescription></DialogHeader>{document.company.logoUrl && <><div className="logo-crop-preview"><img src={document.company.logoUrl} alt="ตัวอย่างการครอปโลโก้" style={{ "--logo-crop-x": `${logoCrop.x}%`, "--logo-crop-y": `${logoCrop.y}%`, "--logo-crop-zoom": String(logoCrop.zoom), "--logo-brightness": `${logoCrop.brightness}%`, "--logo-contrast": `${logoCrop.contrast}%` } as CSSProperties} /></div><div className="logo-editor-controls"><label>ซูม <input type="range" min="1" max="2.4" step="0.05" value={logoCrop.zoom} onChange={(event) => updateLogoCrop({ zoom: Number(event.target.value) })} /><output>{Math.round(logoCrop.zoom * 100)}%</output></label><label>เลื่อนซ้าย–ขวา <input type="range" min="-34" max="34" step="1" value={logoCrop.x} onChange={(event) => updateLogoCrop({ x: Number(event.target.value) })} /><output>{logoCrop.x}</output></label><label>เลื่อนขึ้น–ลง <input type="range" min="-34" max="34" step="1" value={logoCrop.y} onChange={(event) => updateLogoCrop({ y: Number(event.target.value) })} /><output>{logoCrop.y}</output></label><label>ความสว่าง <input type="range" min="70" max="130" step="1" value={logoCrop.brightness} onChange={(event) => updateLogoCrop({ brightness: Number(event.target.value) })} /><output>{logoCrop.brightness}%</output></label><label>ความคมชัด <input type="range" min="70" max="130" step="1" value={logoCrop.contrast} onChange={(event) => updateLogoCrop({ contrast: Number(event.target.value) })} /><output>{logoCrop.contrast}%</output></label></div></>}<DialogFooter><button type="button" className="workspace-action" onClick={() => updateDocument("logoCrop", { ...defaultLogoCrop })}>รีเซ็ตการปรับแต่ง</button><button type="button" className="button button-download" onClick={() => setIsLogoEditorOpen(false)}>ใช้กับเอกสาร</button></DialogFooter></DialogContent></Dialog>
         <div className="shell document-grid reference-document-grid">
