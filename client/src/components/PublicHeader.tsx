@@ -20,8 +20,9 @@ export default function PublicHeader() {
           <a href="/#how-it-works" onClick={closeMenu}>วิธีใช้งาน</a>
           <a href="/#why-tools-thai" onClick={closeMenu}>ทำไมต้อง Tools Thai</a>
           <Link href="/pricing-calculator" onClick={closeMenu}>คำนวณราคาขาย</Link>
-          <Link className="nav-cta-mobile" href={isAuthenticated ? "/account" : "/quotation"} onClick={closeMenu}>
-            {isAuthenticated ? "บัญชีของฉัน" : "เริ่มสร้างเอกสาร"} <ArrowUpRight size={16} />
+          {isAuthenticated && <Link href="/documents" onClick={closeMenu}>เอกสารของฉัน</Link>}
+          <Link className="nav-cta-mobile" href={isAuthenticated ? "/documents" : "/quotation"} onClick={closeMenu}>
+            {isAuthenticated ? "เอกสารของฉัน" : "เริ่มสร้างเอกสาร"} <ArrowUpRight size={16} />
           </Link>
         </nav>
         {isAuthenticated ? <Link className="nav-cta" href="/account">บัญชีของฉัน <ArrowUpRight size={16} /></Link> : <button className="nav-cta" type="button" onClick={startLogin}>บันทึกงานของฉัน <ArrowUpRight size={16} /></button>}

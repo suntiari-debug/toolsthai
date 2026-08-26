@@ -19,6 +19,7 @@ import { getDocumentValidationIssues } from "@/lib/documentValidation";
 import { businessDocumentTemplates, documentFontChoices, documentFontSizeChoices, normalizeDocumentAccentColor, normalizeDocumentFontFamily, normalizeDocumentFontSize, normalizeDocumentTemplate, type DocumentDesignSettings, type DocumentTemplate } from "@/lib/documentDesign";
 import { createLogoPresetExport, filterLogoPresets, LEGACY_LOGO_PRESETS_STORAGE_KEY, LOGO_PRESETS_STORAGE_KEY, logoPresetCategories, MAX_LOGO_PRESET_IMPORT_BYTES, MAX_LOGO_PRESETS, mergeLogoPresets, parseLogoPresetImport, parseStoredPreviewHighlight, PREVIEW_HIGHLIGHT_PREFERENCE_STORAGE_KEY, sanitizeLogoPresets, serializeLogoPresets, type LogoPreset, type LogoPresetCategory } from "@/lib/documentPreferences";
 import { getItemPreviewHighlightTarget, getPreviewHighlightTarget, type PreviewHighlightTarget } from "@/lib/previewHighlight";
+import { restoreDocumentResume } from "@/lib/documentCenterNavigation";
 import "../styles/document-typography.css";
 import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollBehavior, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
 
@@ -265,16 +266,8 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const clearPreviewTouch = () => { pinchState.current = null; panState.current = null; singleTouchState.current = null; };
 
   useEffect(() => {
-    const saved = window.sessionStorage.getItem("toolsThai.convertedDocument");
-    if (saved) {
-      try {
-        setDocument(restoreDocument(saved, kind));
-        window.sessionStorage.removeItem("toolsThai.convertedDocument");
-        return;
-      } catch {
-        window.sessionStorage.removeItem("toolsThai.convertedDocument");
-      }
-    }
+    const resumedDocument = restoreDocumentResume(window.sessionStorage, kind);
+    if (resumedDocument) { setDocument(resumedDocument); return; }
     setDocument(createInitialDocument(kind));
   }, [kind]);
 

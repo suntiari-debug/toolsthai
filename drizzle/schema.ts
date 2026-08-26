@@ -40,6 +40,8 @@ export const savedDocuments = mysqlTable("saved_documents", {
   documentNumber: varchar("documentNumber", { length: 64 }).notNull(),
   customerName: varchar("customerName", { length: 255 }),
   payload: text("payload").notNull(),
+  status: mysqlEnum("status", ["draft", "sent", "paid", "overdue"]).default("draft").notNull(),
+  archivedAt: timestamp("archivedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

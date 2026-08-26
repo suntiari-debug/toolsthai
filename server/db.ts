@@ -1,9 +1,13 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { companyProfiles, InsertUser, savedDocuments, users } from "../drizzle/schema";
+import { createDuplicateDocument, type DocumentStatus, type DuplicateDocumentSource } from "../shared/documentCenter";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+
+export type SavedDocumentKind = "quotation" | "invoice" | "receipt" | "delivery-note" | "tax-invoice";
+export type SavedDocumentStatus = DocumentStatus;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -62,14 +66,59 @@ export async function saveCompanyProfile(input: { userId: number; name: string; 
   return getCompanyProfile(input.userId);
 }
 
-export async function saveDocument(input: { userId: number; kind: "quotation" | "invoice" | "receipt" | "delivery-note" | "tax-invoice"; documentNumber: string; customerName?: string; payload: string }) {
+export async function saveDocument(input: { userId: number; kind: SavedDocumentKind; documentNumber: string; customerName?: string; payload: string; status?: SavedDocumentStatus }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   await db.insert(savedDocuments).values(input);
 }
 
-export async function listSavedDocuments(userId: number) {
+export async function listSavedDocuments(userId: number, filters: { query?: string; kind?: SavedDocumentKind; status?: SavedDocumentStatus; includeArchived?: boolean } = {}) {
   const db = await getDb();
   if (!db) return [];
-  return db.select({ id: savedDocuments.id, kind: savedDocuments.kind, documentNumber: savedDocuments.documentNumber, customerName: savedDocuments.customerName, payload: savedDocuments.payload, updatedAt: savedDocuments.updatedAt, createdAt: savedDocuments.createdAt }).from(savedDocuments).where(eq(savedDocuments.userId, userId)).orderBy(desc(savedDocuments.updatedAt)).limit(50);
+  const query = filters.query?.trim();
+  return db.select({ id: savedDocuments.id, kind: savedDocuments.kind, documentNumber: savedDocuments.documentNumber, customerName: savedDocuments.customerName, payload: savedDocuments.payload, status: savedDocuments.status, archivedAt: savedDocuments.archivedAt, updatedAt: savedDocuments.updatedAt, createdAt: savedDocuments.createdAt }).from(savedDocuments).where(and(
+    eq(savedDocuments.userId, userId),
+    filters.includeArchived ? undefined : isNull(savedDocuments.archivedAt),
+    filters.kind ? eq(savedDocuments.kind, filters.kind) : undefined,
+    filters.status ? eq(savedDocuments.status, filters.status) : undefined,
+    query ? or(like(savedDocuments.documentNumber, `%${query}%`), like(savedDocuments.customerName, `%${query}%`)) : undefined,
+  )).orderBy(desc(savedDocuments.updatedAt)).limit(100);
+}
+
+export async function setDocumentStatus(userId: number, id: number, status: SavedDocumentStatus) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(savedDocuments).set({ status }).where(and(eq(savedDocuments.id, id), eq(savedDocuments.userId, userId)));
+}
+
+export async function setDocumentArchived(userId: number, id: number, archived: boolean) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(savedDocuments).set({ archivedAt: archived ? new Date() : null }).where(and(eq(savedDocuments.id, id), eq(savedDocuments.userId, userId)));
+}
+
+export type DuplicateDocumentStore = {
+  findByOwner: (userId: number, id: number) => Promise<DuplicateDocumentSource | null>;
+  insert: (document: { userId: number } & ReturnType<typeof createDuplicateDocument>) => Promise<void>;
+};
+
+export async function duplicateSavedDocumentFromStore(store: DuplicateDocumentStore, userId: number, id: number) {
+  const source = await store.findByOwner(userId, id);
+  if (!source) throw new Error("ไม่พบเอกสารที่ต้องการทำสำเนา");
+  const duplicate = createDuplicateDocument(source);
+  await store.insert({ userId, ...duplicate });
+  return { documentNumber: duplicate.documentNumber };
+}
+
+export async function duplicateSavedDocument(userId: number, id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return duplicateSavedDocumentFromStore({
+    findByOwner: async (ownerId, documentId) => {
+      const source = await db.select().from(savedDocuments).where(and(eq(savedDocuments.id, documentId), eq(savedDocuments.userId, ownerId))).limit(1);
+      const document = source[0];
+      return document ? { kind: document.kind, documentNumber: document.documentNumber, customerName: document.customerName, payload: document.payload } : null;
+    },
+    insert: async (document) => { await db.insert(savedDocuments).values(document); },
+  }, userId, id);
 }

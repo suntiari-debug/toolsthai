@@ -7,6 +7,8 @@ import PublicFooter from "@/components/PublicFooter";
 import PublicHeader from "@/components/PublicHeader";
 import { trpc } from "@/lib/trpc";
 import { readDocumentAssetAsDataUrl, validateDocumentAssetFile } from "@/lib/documentAssets";
+import { persistDocumentResume } from "@/lib/documentCenterNavigation";
+import type { DocumentKind } from "@/lib/document";
 
 type ProfileForm = { name: string; address: string; taxId: string; phone: string; email: string; signerName: string; signerPosition: string; logoDataUrl: string; existingLogoUrl: string; signatureDataUrl: string; existingSignatureUrl: string; stampDataUrl: string; existingStampUrl: string };
 const emptyProfile: ProfileForm = { name: "", address: "", taxId: "", phone: "", email: "", signerName: "", signerPosition: "", logoDataUrl: "", existingLogoUrl: "", signatureDataUrl: "", existingSignatureUrl: "", stampDataUrl: "", existingStampUrl: "" };
@@ -51,8 +53,8 @@ export default function Account() {
   };
 
   const openSavedDocument = (payload: string, kind: string) => {
-    window.sessionStorage.setItem("toolsThai.convertedDocument", payload);
-    setLocation(`/${kind}`);
+    const resume = persistDocumentResume(window.sessionStorage, payload, kind as DocumentKind);
+    setLocation(resume.path);
   };
 
   if (!isAuthenticated) return <div className="app-page"><PublicHeader /><main className="account-gate shell"><span><UserRound size={30} /></span><p className="page-kicker">YOUR TOOLS THAI ACCOUNT</p><h1>บันทึกข้อมูล<br />เพื่อทำงานต่อได้เร็วขึ้น</h1><p>{loading ? "กำลังตรวจสอบสถานะบัญชีของคุณ..." : "เครื่องมือพื้นฐานใช้ได้ฟรีโดยไม่ต้องสมัคร แต่การเก็บ template บริษัทและประวัติเอกสารจะพร้อมใช้งานหลังเข้าสู่ระบบ"}</p><button type="button" onClick={startLogin} className="button button-primary"><LogIn size={17} /> เข้าสู่ระบบเพื่อบันทึกข้อมูล</button><Link href="/" className="text-button"><ArrowLeft size={16} /> กลับหน้าหลัก</Link></main><PublicFooter /></div>;

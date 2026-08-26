@@ -14,3 +14,17 @@
 - [x] ตรวจ visual preview บน desktop และ mobile
 - [x] บันทึก checkpoint เมื่อทุกงานเสร็จและสรุปขั้นตอนก่อน Publish
 - [x] แก้ migration company profile ที่เพิ่ม defaultDocumentTemplate ซ้ำก่อน apply database schema
+- [x] ออกแบบสถานะเอกสารและ filter model สำหรับศูนย์เอกสาร
+- [x] เพิ่ม status และ archivedAt ใน saved_documents schema พร้อม migration ที่ปลอดภัย
+- [x] เพิ่ม tRPC สำหรับค้นหา กรอง เปลี่ยนสถานะ ทำสำเนา และเก็บถาวรเอกสาร
+- [x] สร้างหน้า Document Center ที่ responsive พร้อม search, filters, table/list และ actions
+- [x] เชื่อมการเปิดเอกสารจาก Document Center กลับเข้า document editor และรองรับ duplicate
+- [x] เพิ่ม Vitest สำหรับ document center workflow และตรวจ TypeScript, build, runtime, desktop/mobile preview
+- [x] บันทึก checkpoint และสรุปผล Module 1
+- [x] เพิ่ม workflow tests สำหรับ filter, status, archive, duplicate และ ownership guard ของ Document Center
+- [x] ยืนยัน flow เปิดเอกสารจาก /documents ไปยัง editor และการใช้งานสำเนาต่อผ่าน sessionStorage
+- [x] เพิ่ม integration-style test ว่า resume payload จาก Document Center restore เข้า editor ได้จริง
+- [x] เพิ่ม integration-style test ว่า duplicate document สร้างหมายเลขใหม่และ payload เดิมยัง restore ได้
+- [x] รวม sessionStorage resume flow เป็น helper ที่ DocumentCenter, Account และ DocumentTool ใช้จริง พร้อมทดสอบ storage-to-editor integration
+- [x] รวม duplicate payload builder เป็น logic ที่ database helper ใช้จริง พร้อมทดสอบ source-to-copy-to-editor integration
+- [x] เพิ่ม server integration test ของ duplicateSavedDocument โดย mock database select/insert และตรวจ record สำเนา

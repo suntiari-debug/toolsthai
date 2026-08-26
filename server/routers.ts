@@ -7,6 +7,13 @@ import * as db from "./db";
 import { storagePut } from "./storage";
 
 const documentKind = z.enum(["quotation", "invoice", "receipt", "delivery-note", "tax-invoice"]);
+const documentStatus = z.enum(["draft", "sent", "paid", "overdue"]);
+const documentListInput = z.object({
+  query: z.string().trim().max(120).optional(),
+  kind: documentKind.optional(),
+  status: documentStatus.optional(),
+  includeArchived: z.boolean().optional(),
+}).optional();
 const companyProfileInput = z.object({
   name: z.string().trim().min(1).max(255),
   address: z.string().trim().max(2000).optional(),
@@ -72,11 +79,20 @@ export const appRouter = router({
     }),
   }),
   documents: router({
-    list: protectedProcedure.query(({ ctx }) => db.listSavedDocuments(ctx.user.id)),
-    save: protectedProcedure.input(z.object({ kind: documentKind, documentNumber: z.string().trim().min(1).max(64), customerName: z.string().trim().max(255).optional(), payload: z.string().min(2).max(60_000) })).mutation(async ({ ctx, input }) => {
+    list: protectedProcedure.input(documentListInput).query(({ ctx, input }) => db.listSavedDocuments(ctx.user.id, input)),
+    save: protectedProcedure.input(z.object({ kind: documentKind, documentNumber: z.string().trim().min(1).max(64), customerName: z.string().trim().max(255).optional(), payload: z.string().min(2).max(60_000), status: documentStatus.optional() })).mutation(async ({ ctx, input }) => {
       await db.saveDocument({ userId: ctx.user.id, ...input });
       return { success: true } as const;
     }),
+    updateStatus: protectedProcedure.input(z.object({ id: z.number().int().positive(), status: documentStatus })).mutation(async ({ ctx, input }) => {
+      await db.setDocumentStatus(ctx.user.id, input.id, input.status);
+      return { success: true } as const;
+    }),
+    setArchived: protectedProcedure.input(z.object({ id: z.number().int().positive(), archived: z.boolean() })).mutation(async ({ ctx, input }) => {
+      await db.setDocumentArchived(ctx.user.id, input.id, input.archived);
+      return { success: true } as const;
+    }),
+    duplicate: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => db.duplicateSavedDocument(ctx.user.id, input.id)),
   }),
 });
 

@@ -54,6 +54,12 @@ export const homeSeo: HomeSeoProfile = {
   intro: "ออกใบเสนอราคา ใบแจ้งหนี้ ใบเสร็จรับเงิน และคำนวณต้นทุนได้จากที่เดียว พร้อม PDF ภาษาไทย ไม่ต้องสมัคร",
 };
 
+export const documentCenterSeo = {
+  path: "/documents",
+  title: "ศูนย์เอกสารธุรกิจของฉัน | Tools Thai",
+  description: "จัดการ ค้นหา และติดตามสถานะเอกสารธุรกิจที่บันทึกไว้ในบัญชี Tools Thai",
+};
+
 export const documentSeo: Record<DocumentSeoKind, DocumentSeoProfile> = {
   quotation: {
     path: "/quotation",
@@ -121,6 +127,7 @@ export function getDocumentStructuredData(kind: string, origin?: string) {
 export function getSeoHead(path: string, origin?: string): SsrHead {
   const canonicalOrigin = getCanonicalOrigin(origin);
   if (path === homeSeo.path) return { title: homeSeo.title, description: homeSeo.description, canonicalPath: homeSeo.path, jsonLd: homeStructuredData(canonicalOrigin) };
+  if (path === documentCenterSeo.path) return { title: documentCenterSeo.title, description: documentCenterSeo.description, canonicalPath: documentCenterSeo.path, jsonLd: [] };
   const kind = path.replace(/^\//, "") as DocumentSeoKind;
   const page = getDocumentSeo(kind);
   if (!page) throw new Error(`Unsupported SEO SSR route: ${path}`);
