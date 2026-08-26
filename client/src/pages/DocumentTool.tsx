@@ -41,18 +41,23 @@ const templateChoices: Array<{ id: DocumentTemplate; title: string; description:
 ];
 
 const accentChoices = ["#0d7a75", "#2563d9", "#bd1f2d", "#7c3aed", "#17191c", "#d97706"];
+const HYDRATION_SEED_DATE = new Date("2000-06-15T12:00:00.000Z");
+
+function createHydrationSeedDocument(kind: DocumentKind) {
+  return createInitialDocument(kind, { now: HYDRATION_SEED_DATE, itemId: `hydration-${kind}-item` });
+}
 
 export default function DocumentTool({ kind }: DocumentToolProps) {
   const [, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
-  const [document, setDocument] = useState<BusinessDocument>(() => createInitialDocument(kind));
+  const [document, setDocument] = useState<BusinessDocument>(() => createHydrationSeedDocument(kind));
   const [notice, setNotice] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [previewZoom, setPreviewZoom] = useState<PreviewZoom>(0);
   const [previewPan, setPreviewPan] = useState<PreviewPan>({ x: 0, y: 0 });
   const [isPreviewZoomRestored, setIsPreviewZoomRestored] = useState(false);
   const [isPreviewResetAnimating, setIsPreviewResetAnimating] = useState(false);
-  const [previewZoomDevice, setPreviewZoomDevice] = useState<PreviewZoomDevice>(() => typeof window === "undefined" ? "desktop" : getPreviewZoomDevice(window.innerWidth));
+  const [previewZoomDevice, setPreviewZoomDevice] = useState<PreviewZoomDevice>("desktop");
   const [activePreviewHighlight, setActivePreviewHighlight] = useState<PreviewHighlightTarget | null>(null);
   const [isPreviewHighlightEnabled, setIsPreviewHighlightEnabled] = useState(true);
   const [isPreviewHighlightRestored, setIsPreviewHighlightRestored] = useState(false);

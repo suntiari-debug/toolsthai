@@ -2,6 +2,15 @@ import { describe, expect, it } from "vitest";
 import { amountToThaiWords, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampRotation, boundedStampScale, calculateDocumentTotals, convertDocument, createInitialDocument, restoreDocument } from "./document";
 
 describe("document calculations", () => {
+  it("creates a deterministic hydration seed when time and item id are supplied", () => {
+    const seed = new Date("2000-06-15T12:00:00.000Z");
+    const serverDocument = createInitialDocument("quotation", { now: seed, itemId: "hydration-quotation-item" });
+    const clientDocument = createInitialDocument("quotation", { now: seed, itemId: "hydration-quotation-item" });
+
+    expect(clientDocument).toEqual(serverDocument);
+    expect(serverDocument.items[0]?.id).toBe("hydration-quotation-item");
+  });
+
   it("calculates an excluded VAT document with discount", () => {
     const document = createInitialDocument("quotation");
     document.items = [

@@ -103,35 +103,34 @@ export const documentMeta: Record<DocumentKind, { title: string; english: string
   "tax-invoice": { title: "ใบกำกับภาษี", english: "TAX INVOICE", prefix: "TI", intro: "จัดรูปแบบใบกำกับภาษีเพื่อช่วยเตรียมเอกสารธุรกิจ" },
 };
 
-function todayISO() {
-  const date = new Date();
+function todayISO(date = new Date()) {
   const offset = date.getTimezoneOffset();
   return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 10);
 }
 
-function nextDateISO(days: number) {
-  const date = new Date();
+function nextDateISO(days: number, sourceDate = new Date()) {
+  const date = new Date(sourceDate);
   date.setDate(date.getDate() + days);
   const offset = date.getTimezoneOffset();
   return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 10);
 }
 
-export function makeDocumentNumber(kind: DocumentKind) {
-  const now = new Date();
+export function makeDocumentNumber(kind: DocumentKind, now = new Date()) {
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   return `${documentMeta[kind].prefix}-${year}${month}-001`;
 }
 
-export function createInitialDocument(kind: DocumentKind): BusinessDocument {
+export function createInitialDocument(kind: DocumentKind, options: { now?: Date; itemId?: string } = {}): BusinessDocument {
+  const now = options.now ?? new Date();
   return {
     kind,
-    documentNumber: makeDocumentNumber(kind),
-    issueDate: todayISO(),
-    dueDate: nextDateISO(kind === "quotation" ? 30 : 7),
+    documentNumber: makeDocumentNumber(kind, now),
+    issueDate: todayISO(now),
+    dueDate: nextDateISO(kind === "quotation" ? 30 : 7, now),
     company: { name: "", address: "", taxId: "", phone: "", email: "", logoUrl: "" },
     customer: { name: "", address: "", taxId: "", contact: "" },
-    items: [{ id: crypto.randomUUID(), name: "สินค้า / บริการ", description: "", quantity: 1, unit: "รายการ", unitPrice: 0 }],
+    items: [{ id: options.itemId ?? crypto.randomUUID(), name: "สินค้า / บริการ", description: "", quantity: 1, unit: "รายการ", unitPrice: 0 }],
     discount: 0,
     vatRate: 7,
     vatMode: "excluded",

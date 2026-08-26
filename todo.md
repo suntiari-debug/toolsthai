@@ -28,3 +28,7 @@
 - [x] รวม sessionStorage resume flow เป็น helper ที่ DocumentCenter, Account และ DocumentTool ใช้จริง พร้อมทดสอบ storage-to-editor integration
 - [x] รวม duplicate payload builder เป็น logic ที่ database helper ใช้จริง พร้อมทดสอบ source-to-copy-to-editor integration
 - [x] เพิ่ม server integration test ของ duplicateSavedDocument โดย mock database select/insert และตรวจ record สำเนา
+- [x] ตรวจต้นเหตุ hydration mismatch ของหน้า /quotation ระหว่าง SSR และ client
+- [x] แก้ client-only หรือ non-deterministic render ในหน้าใบเสนอราคาและเพิ่ม regression coverage
+- [x] ตรวจ TypeScript, SSR, runtime และ Browser console หลังแก้ hydration mismatch
+- [x] บันทึก checkpoint และสรุปการแก้ hydration mismatch
