@@ -1,6 +1,6 @@
-import { and, desc, eq, isNull, like, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { companyProfiles, InsertUser, savedDocuments, users } from "../drizzle/schema";
+import { companyProfiles, documentExports, InsertUser, savedDocuments, users } from "../drizzle/schema";
 import { createDuplicateDocument, type DocumentStatus, type DuplicateDocumentSource } from "../shared/documentCenter";
 import { ENV } from "./_core/env";
 
@@ -8,6 +8,16 @@ let _db: ReturnType<typeof drizzle> | null = null;
 
 export type SavedDocumentKind = "quotation" | "invoice" | "receipt" | "delivery-note" | "tax-invoice";
 export type SavedDocumentStatus = DocumentStatus;
+export type DocumentExportInput = { userId: number; kind: SavedDocumentKind; documentNumber: string; customerName?: string; payload: string; filename: string };
+
+export function summarizeDocumentExportHistory(records: Array<{ documentId: number; createdAt: Date }>) {
+  const historySummary = new Map<number, { exportCount: number; lastExportedAt: Date }>();
+  for (const item of records) {
+    const summary = historySummary.get(item.documentId);
+    historySummary.set(item.documentId, summary ? { exportCount: summary.exportCount + 1, lastExportedAt: summary.lastExportedAt } : { exportCount: 1, lastExportedAt: item.createdAt });
+  }
+  return historySummary;
+}
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -76,13 +86,40 @@ export async function listSavedDocuments(userId: number, filters: { query?: stri
   const db = await getDb();
   if (!db) return [];
   const query = filters.query?.trim();
-  return db.select({ id: savedDocuments.id, kind: savedDocuments.kind, documentNumber: savedDocuments.documentNumber, customerName: savedDocuments.customerName, payload: savedDocuments.payload, status: savedDocuments.status, archivedAt: savedDocuments.archivedAt, updatedAt: savedDocuments.updatedAt, createdAt: savedDocuments.createdAt }).from(savedDocuments).where(and(
+  const documents = await db.select({ id: savedDocuments.id, kind: savedDocuments.kind, documentNumber: savedDocuments.documentNumber, customerName: savedDocuments.customerName, payload: savedDocuments.payload, status: savedDocuments.status, archivedAt: savedDocuments.archivedAt, updatedAt: savedDocuments.updatedAt, createdAt: savedDocuments.createdAt }).from(savedDocuments).where(and(
     eq(savedDocuments.userId, userId),
     filters.includeArchived ? undefined : isNull(savedDocuments.archivedAt),
     filters.kind ? eq(savedDocuments.kind, filters.kind) : undefined,
     filters.status ? eq(savedDocuments.status, filters.status) : undefined,
     query ? or(like(savedDocuments.documentNumber, `%${query}%`), like(savedDocuments.customerName, `%${query}%`)) : undefined,
   )).orderBy(desc(savedDocuments.updatedAt)).limit(100);
+  if (!documents.length) return [];
+  const exports = await db.select({ documentId: documentExports.documentId, createdAt: documentExports.createdAt }).from(documentExports).where(and(eq(documentExports.userId, userId), inArray(documentExports.documentId, documents.map((document) => document.id)))).orderBy(desc(documentExports.createdAt));
+  const historySummary = summarizeDocumentExportHistory(exports);
+  return documents.map((document) => ({ ...document, exportCount: historySummary.get(document.id)?.exportCount ?? 0, lastExportedAt: historySummary.get(document.id)?.lastExportedAt ?? null }));
+}
+
+export async function recordDocumentExport(input: DocumentExportInput) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const existing = await db.select({ id: savedDocuments.id }).from(savedDocuments).where(and(eq(savedDocuments.userId, input.userId), eq(savedDocuments.kind, input.kind), eq(savedDocuments.documentNumber, input.documentNumber))).orderBy(desc(savedDocuments.updatedAt)).limit(1);
+  let documentId = existing[0]?.id;
+  if (documentId) {
+    await db.update(savedDocuments).set({ customerName: input.customerName ?? null, payload: input.payload, updatedAt: new Date() }).where(and(eq(savedDocuments.id, documentId), eq(savedDocuments.userId, input.userId)));
+  } else {
+    await db.insert(savedDocuments).values({ userId: input.userId, kind: input.kind, documentNumber: input.documentNumber, customerName: input.customerName, payload: input.payload });
+    const created = await db.select({ id: savedDocuments.id }).from(savedDocuments).where(and(eq(savedDocuments.userId, input.userId), eq(savedDocuments.kind, input.kind), eq(savedDocuments.documentNumber, input.documentNumber))).orderBy(desc(savedDocuments.createdAt)).limit(1);
+    documentId = created[0]?.id;
+  }
+  if (!documentId) throw new Error("ไม่สามารถบันทึกเอกสารสำหรับประวัติการส่งออกได้");
+  await db.insert(documentExports).values({ userId: input.userId, documentId, filename: input.filename });
+  return { documentId };
+}
+
+export async function listDocumentExports(userId: number, documentId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: documentExports.id, filename: documentExports.filename, createdAt: documentExports.createdAt }).from(documentExports).where(and(eq(documentExports.userId, userId), eq(documentExports.documentId, documentId))).orderBy(desc(documentExports.createdAt)).limit(30);
 }
 
 export async function setDocumentStatus(userId: number, id: number, status: SavedDocumentStatus) {

@@ -46,5 +46,13 @@ export const savedDocuments = mysqlTable("saved_documents", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const documentExports = mysqlTable("document_exports", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  documentId: int("documentId").notNull().references(() => savedDocuments.id, { onDelete: "cascade" }),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;

@@ -37,4 +37,16 @@ describe("documents router", () => {
     expect(archived).toHaveBeenCalledWith(41, 9, true);
     expect(duplicate).toHaveBeenCalledWith(41, 9);
   });
+
+  it("records and reads PDF export history through the authenticated owner", async () => {
+    const record = vi.spyOn(db, "recordDocumentExport").mockResolvedValue({ documentId: 12 });
+    const listExports = vi.spyOn(db, "listDocumentExports").mockResolvedValue([]);
+    const caller = appRouter.createCaller(createContext());
+
+    await expect(caller.documents.recordExport({ kind: "quotation", documentNumber: "QT-001", customerName: "ACME", payload: "{}", filename: "ใบเสนอราคา ACME.pdf" })).resolves.toEqual({ documentId: 12 });
+    await caller.documents.listExports({ documentId: 12 });
+
+    expect(record).toHaveBeenCalledWith({ userId: 41, kind: "quotation", documentNumber: "QT-001", customerName: "ACME", payload: "{}", filename: "ใบเสนอราคา ACME.pdf" });
+    expect(listExports).toHaveBeenCalledWith(41, 12);
+  });
 });

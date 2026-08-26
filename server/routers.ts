@@ -93,6 +93,8 @@ export const appRouter = router({
       return { success: true } as const;
     }),
     duplicate: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => db.duplicateSavedDocument(ctx.user.id, input.id)),
+    recordExport: protectedProcedure.input(z.object({ kind: documentKind, documentNumber: z.string().trim().min(1).max(64), customerName: z.string().trim().max(255).optional(), payload: z.string().min(2).max(60_000), filename: z.string().trim().min(5).max(255).regex(/\.pdf$/i) })).mutation(({ ctx, input }) => db.recordDocumentExport({ userId: ctx.user.id, ...input })),
+    listExports: protectedProcedure.input(z.object({ documentId: z.number().int().positive() })).query(({ ctx, input }) => db.listDocumentExports(ctx.user.id, input.documentId)),
   }),
 });
 

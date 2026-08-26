@@ -39,3 +39,14 @@
 - [x] ยืนยัน browser-level loading overlay ของ PDF export ผ่านการจำลอง workflow ที่ไม่สร้างไฟล์ผู้ใช้จริง (production runtime แสดง "กำลังเตรียมเอกสาร", ดาวน์โหลด QT-202608-001.pdf และ overlay ปิดหลังเริ่มดาวน์โหลด)
 - [x] เพิ่ม browser verification ของ PDF overlay ใน repository และผูกคำสั่ง test:pdf-overlay เพื่อรันซ้ำได้ (กำหนด TOOLSTHAI_BROWSER_BASE_URL)
 - [x] บันทึก checkpoint และสรุป PDF loading experience
+- [x] วิเคราะห์ contract ปัจจุบันของ PDF export, saved document และ Document Center สำหรับออกแบบ export history
+- [x] เพิ่ม schema, migration และ tRPC API แบบ owner-scoped สำหรับประวัติการส่งออก PDF
+- [x] เพิ่มหน้าต่างตั้งชื่อไฟล์และ PDF preview ก่อนยืนยันดาวน์โหลด
+- [x] บันทึกและแสดงประวัติการส่งออกใน Document Center พร้อมทดสอบ ownership และ UI workflow
+- [x] ตรวจ TypeScript, Vitest, production build และ browser flow ของ PDF preview/export history (66 tests ผ่าน, browser ดาวน์โหลดชื่อไฟล์ไทยที่กำหนด และ mobile dialog อยู่ใน viewport)
+- [x] เพิ่ม test สำหรับ export history summary/owner scope และตรวจ dialog ของ Document Center เมื่อมีหรือไม่มีประวัติ
+- [x] เพิ่ม test สำหรับ export history summary/owner scope และตรวจ dialog ของ Document Center เมื่อมีหรือไม่มีประวัติ
+- [x] ยืนยัน UI workflow ของ Document Center export history จาก browser fixture ก่อน checkpoint (แสดง PDF 2 และ dialog มี filename/timestamp ครบ)
+- [x] เพิ่ม unit test aggregation ของ exportCount และ lastExportedAt ใน document history summary
+- [x] เพิ่ม assertion timestamp และ empty-state ให้ browser fixture ของ Document Center export history
+- [x] บันทึก checkpoint และสรุป PDF export workflow ที่ขยายแล้ว
