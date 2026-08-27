@@ -1,0 +1,34 @@
+import { FileText, ImagePlus, Loader2, Paperclip, RotateCcw, Trash2, TriangleAlert, Upload, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { formatAttachmentSize, paymentAttachmentAccept, readPaymentAttachmentAsDataUrl, validatePaymentAttachmentFile } from "@/lib/paymentAttachments";
+import { trpc } from "@/lib/trpc";
+import "../styles/payment-attachments.css";
+
+type Attachment = { id: number; paymentId: number; originalFilename: string; mimeType: "image/png" | "image/jpeg" | "image/webp" | "application/pdf"; sizeBytes: number; caption: string | null; createdAt: Date | string; thumbnailUrl: string | null };
+type PaymentAttachmentsProps = { paymentId: number; voidedAt?: Date | string | null; attachments: Attachment[]; onChanged: () => Promise<void> };
+
+export default function PaymentAttachments({ paymentId, voidedAt, attachments, onChanged }: PaymentAttachmentsProps) {
+  const utils = trpc.useUtils();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [caption, setCaption] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [message, setMessage] = useState("");
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const upload = trpc.receivables.uploadPaymentAttachment.useMutation({ onSuccess: async () => { setPendingFile(null); setCaption(""); setProgress(100); setMessage("แนบหลักฐานการรับชำระแล้ว"); await onChanged(); }, onError: (error) => { setProgress(0); setMessage(error.message || "ไม่สามารถอัปโหลดหลักฐานได้"); } });
+  const remove = trpc.receivables.deletePaymentAttachment.useMutation({ onSuccess: async () => { setDeleting(null); setMessage("ย้ายหลักฐานออกจากรายการแล้ว"); await onChanged(); }, onError: (error) => { setDeleting(null); setMessage(error.message || "ไม่สามารถลบหลักฐานได้"); } });
+  const uploadFile = async (file: File) => {
+    const validation = validatePaymentAttachmentFile(file);
+    if (!validation.valid) { setMessage(validation.message); setPendingFile(null); setProgress(0); return; }
+    setPendingFile(file); setMessage("กำลังเตรียมไฟล์หลักฐาน..."); setProgress(15);
+    try { const dataUrl = await readPaymentAttachmentAsDataUrl(file, setProgress); setProgress(75); setMessage("กำลังอัปโหลดไฟล์อย่างปลอดภัย..."); await upload.mutateAsync({ paymentId, originalFilename: file.name, caption: caption.trim() || undefined, dataUrl }); } catch (error) { setProgress(0); setMessage(error instanceof Error ? error.message : "ไม่สามารถอ่านไฟล์หลักฐานได้"); }
+  };
+  const openAttachment = async (attachment: Attachment) => {
+    const preview = window.open("", "_blank", "noopener,noreferrer");
+    setMessage("กำลังเตรียมไฟล์สำหรับดู...");
+    try { const viewed = await utils.receivables.viewPaymentAttachment.fetch({ attachmentId: attachment.id }); if (preview) preview.location.href = viewed.url; else window.open(viewed.url, "_blank", "noopener,noreferrer"); setMessage(""); } catch (error) { preview?.close(); setMessage(error instanceof Error ? error.message : "ไม่สามารถเปิดหลักฐานได้"); }
+  };
+  const isImage = (attachment: Attachment) => attachment.mimeType.startsWith("image/");
+  return <section className="payment-attachments" aria-label="หลักฐานการรับชำระ"><div className="payment-attachments-heading"><div><h3><Paperclip size={16} /> หลักฐานการรับชำระ</h3><p>รองรับ PNG, JPG, WEBP และ PDF ไม่เกิน 5 MB</p></div><span>{attachments.length} ไฟล์</span></div>{voidedAt ? <p className="payment-attachments-voided"><TriangleAlert size={15} /> รายการนี้ยกเลิกแล้ว จึงไม่สามารถเพิ่มหลักฐานใหม่ได้</p> : <div className="payment-attachments-upload"><label className="payment-attachment-caption"><span>คำอธิบาย (ไม่บังคับ)</span><input value={caption} maxLength={500} onChange={(event) => setCaption(event.target.value)} placeholder="เช่น สลิปโอนเงินงวดที่ 1" /></label><input ref={inputRef} className="sr-only" type="file" accept={paymentAttachmentAccept} capture="environment" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); event.currentTarget.value = ""; }} /><button type="button" className="payment-attachment-upload-button" disabled={upload.isPending} onClick={() => inputRef.current?.click()}><Upload size={15} /> {upload.isPending ? "กำลังอัปโหลด..." : "เลือกไฟล์หรือถ่ายรูป"}</button>{upload.isPending ? <div className="payment-attachment-progress" role="status"><div><span>{message}</span><b>{progress}%</b></div><progress value={progress} max="100" /></div> : null}{pendingFile && upload.isError ? <button type="button" className="payment-attachment-retry" onClick={() => void uploadFile(pendingFile)}><RotateCcw size={14} /> ลองอัปโหลดอีกครั้ง</button> : null}</div>}{message && !upload.isPending ? <p className={upload.isError || remove.isError ? "payment-attachment-message is-error" : "payment-attachment-message"} role="status">{message}</p> : null}{attachments.length ? <ul className="payment-attachment-list">{attachments.map((attachment) => <li key={attachment.id}><button type="button" className="payment-attachment-preview" onClick={() => void openAttachment(attachment)} aria-label={`ดูไฟล์ ${attachment.originalFilename}`}>{isImage(attachment) && attachment.thumbnailUrl ? <img src={attachment.thumbnailUrl} alt="ตัวอย่างหลักฐานการรับชำระ" /> : isImage(attachment) ? <ImagePlus size={21} /> : <FileText size={24} />}</button><div className="payment-attachment-info"><strong>{attachment.originalFilename}</strong><small>{formatAttachmentSize(attachment.sizeBytes)} · {attachment.mimeType === "application/pdf" ? "PDF" : "รูปภาพ"}{attachment.caption ? ` · ${attachment.caption}` : ""}</small><button type="button" onClick={() => void openAttachment(attachment)}>ดูไฟล์</button></div><button type="button" className="payment-attachment-delete" onClick={() => setDeleting(attachment.id)} aria-label={`ลบหลักฐาน ${attachment.originalFilename}`}><Trash2 size={15} /></button></li>)}</ul> : <div className="payment-attachment-empty"><Paperclip size={20} /><span>ยังไม่มีไฟล์หลักฐานการรับชำระ</span></div>}<AlertDialog open={deleting !== null} onOpenChange={(open) => { if (!open) setDeleting(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>นำหลักฐานออกจากรายการ?</AlertDialogTitle><AlertDialogDescription>ระบบจะซ่อน metadata และเพิกถอนการเข้าถึงผ่านแอปทันที ไฟล์ที่ไม่มี key อ้างอิงจะไม่สามารถเปิดจากระบบได้</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>ยกเลิก</AlertDialogCancel><AlertDialogAction onClick={() => { if (deleting) remove.mutate({ attachmentId: deleting }); }}>นำออก</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></section>;
+}

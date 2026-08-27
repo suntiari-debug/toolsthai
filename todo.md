@@ -74,3 +74,10 @@
 - [x] เพิ่ม automated backend tests สำหรับ customer search ตามชื่อ เลขภาษี ผู้ติดต่อ และ owner scope
 - [x] เพิ่ม automated backend tests สำหรับ pagination page 1/page 2, ordering และจำนวนรายการต่อหน้า
 - [x] ตรวจ regression, commit/push และสร้าง checkpoint Customer Master หลังผ่าน QA
+- [x] อ่าน webdev-file-storage และตรวจ payment modal, audit model กับ storage helpers ปัจจุบัน
+- [x] เพิ่ม payment attachment metadata แบบ additive พร้อม migration review/apply/verify และ foreign keys owner/payment
+- [x] เพิ่ม owner-scoped tRPC upload/list/view/delete ด้วย S3 key ที่ไม่เปิดเผย พร้อม MIME/size validation และ audit events
+- [x] เพิ่ม upload area/progress/retry/preview/view/delete confirm ใน payment modal และ detail สำหรับ desktop/mobile
+- [x] เพิ่ม tests MIME/size/owner authorization/delete semantics/audit และ browser QA upload-view-delete ด้วย test fixture เท่านั้น
+- [x] เพิ่ม direct attachment list contract และ test ว่า owner อื่นอ่านไม่ได้หรือรับ storageKey ไม่ได้
+- [ ] ตรวจ regression, commit/push และสร้าง checkpoint payment attachments หลังผ่าน QA

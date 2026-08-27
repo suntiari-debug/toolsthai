@@ -174,11 +174,28 @@ export const payments = mysqlTable("payments", {
   receivableIdx: index("payments_receivable_idx").on(table.receivableId),
 }));
 
+/** Metadata only; proof bytes live exclusively in S3 and deletedAt hides the key from all future application reads. */
+export const paymentAttachments = mysqlTable("payment_attachments", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  paymentId: int("paymentId").notNull().references(() => payments.id, { onDelete: "cascade" }),
+  storageKey: varchar("storageKey", { length: 1024 }).notNull(),
+  originalFilename: varchar("originalFilename", { length: 255 }).notNull(),
+  mimeType: mysqlEnum("mimeType", ["image/png", "image/jpeg", "image/webp", "application/pdf"]).notNull(),
+  sizeBytes: int("sizeBytes").notNull(),
+  caption: varchar("caption", { length: 500 }),
+  deletedAt: timestamp("deletedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  storageKeyUnique: uniqueIndex("payment_attachments_storage_key_unique").on(table.storageKey),
+  userPaymentDeletedCreatedIdx: index("payment_attachments_user_payment_deleted_created_idx").on(table.userId, table.paymentId, table.deletedAt, table.createdAt),
+}));
+
 export const receivableEvents = mysqlTable("receivable_events", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   receivableId: int("receivableId").notNull().references(() => receivables.id, { onDelete: "cascade" }),
-  type: mysqlEnum("type", ["created", "payment-recorded", "payment-voided", "payment-replaced", "receipt-draft-created"]).notNull(),
+  type: mysqlEnum("type", ["created", "payment-recorded", "payment-voided", "payment-replaced", "receipt-draft-created", "payment-attachment-added", "payment-attachment-removed"]).notNull(),
   paymentId: int("paymentId").references(() => payments.id, { onDelete: "set null" }),
   amount: decimal("amount", { precision: 14, scale: 2 }),
   note: text("note"),
@@ -191,6 +208,7 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Receivable = typeof receivables.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
+export type PaymentAttachment = typeof paymentAttachments.$inferSelect;
 export type ReceivableEvent = typeof receivableEvents.$inferSelect;
 export type DocumentExport = typeof documentExports.$inferSelect;
 export type ReceiptSource = typeof receiptSources.$inferSelect;

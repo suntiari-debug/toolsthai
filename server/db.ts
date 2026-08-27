@@ -1,10 +1,12 @@
-import { and, desc, eq, gte, isNull, like, lt, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, like, lt, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { companyProfiles, customers, documentExports, InsertUser, payments, receivableEvents, receivableReminderSettings, receivableReminders, receivables, receiptSources, savedDocuments, users } from "../drizzle/schema";
+import { companyProfiles, customers, documentExports, InsertUser, paymentAttachments, payments, receivableEvents, receivableReminderSettings, receivableReminders, receivables, receiptSources, savedDocuments, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { buildReceivableActivityEvent, calculateInvoiceTotal, centsToMoney, deriveReceivableStatus, getReceiptDraftEligibility, hasReceiptSourcePaymentChanged, moneyToCents, parseDateOnly, parseInvoicePayload, validatePaymentAmount } from "./receivables";
 import { buildReceivableAgingReport, getMonthBounds } from "./agingReport";
 import { getReminderCandidate, parseReminderDays, REMINDER_TIMEZONE, serializeReminderDays } from "./receivableReminders";
+import { buildPaymentAttachmentStorageName, parsePaymentAttachmentDataUrl, sanitizePaymentAttachmentFilename, type PaymentAttachmentMimeType } from "./paymentAttachments";
+import { storageGetSignedUrl, storagePut } from "./storage";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -360,8 +362,70 @@ export async function getReceivableDetails(userId: number, id: number) {
   const receivable = result[0];
   if (!receivable) return undefined;
   const paymentRows = await db.select({ id: payments.id, amount: payments.amount, paidAt: payments.paidAt, method: payments.method, reference: payments.reference, note: payments.note, voidedAt: payments.voidedAt, voidReason: payments.voidReason, createdAt: payments.createdAt }).from(payments).where(and(eq(payments.receivableId, id), eq(payments.userId, userId))).orderBy(desc(payments.paidAt)).limit(100);
+  const attachmentRows = paymentRows.length ? await db.select({ id: paymentAttachments.id, paymentId: paymentAttachments.paymentId, storageKey: paymentAttachments.storageKey, originalFilename: paymentAttachments.originalFilename, mimeType: paymentAttachments.mimeType, sizeBytes: paymentAttachments.sizeBytes, caption: paymentAttachments.caption, createdAt: paymentAttachments.createdAt }).from(paymentAttachments).where(and(eq(paymentAttachments.userId, userId), isNull(paymentAttachments.deletedAt), inArray(paymentAttachments.paymentId, paymentRows.map((payment) => payment.id)))).orderBy(desc(paymentAttachments.createdAt)).limit(250) : [];
+  const visibleAttachments = await Promise.all(attachmentRows.map(async ({ storageKey, ...attachment }) => ({ ...attachment, thumbnailUrl: attachment.mimeType.startsWith("image/") ? await storageGetSignedUrl(storageKey).catch(() => null) : null })));
+  const attachmentsByPayment = new Map<number, typeof visibleAttachments>();
+  for (const attachment of visibleAttachments) attachmentsByPayment.set(attachment.paymentId, [...(attachmentsByPayment.get(attachment.paymentId) || []), attachment]);
   const events = await db.select({ id: receivableEvents.id, type: receivableEvents.type, paymentId: receivableEvents.paymentId, amount: receivableEvents.amount, note: receivableEvents.note, createdAt: receivableEvents.createdAt }).from(receivableEvents).where(and(eq(receivableEvents.receivableId, id), eq(receivableEvents.userId, userId))).orderBy(desc(receivableEvents.createdAt)).limit(100);
-  return { ...receivable, status: deriveReceivableStatus(receivable.totalAmount, receivable.paidAmount, receivable.dueDate), payments: paymentRows, events };
+  return { ...receivable, status: deriveReceivableStatus(receivable.totalAmount, receivable.paidAmount, receivable.dueDate), payments: paymentRows.map((payment) => ({ ...payment, attachments: attachmentsByPayment.get(payment.id) || [] })), events };
+}
+
+async function getOwnedPaymentForAttachment(userId: number, paymentId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db.select({ id: payments.id, receivableId: payments.receivableId, voidedAt: payments.voidedAt }).from(payments).where(and(eq(payments.id, paymentId), eq(payments.userId, userId))).limit(1);
+  const payment = rows[0];
+  if (!payment) throw new Error("ไม่พบรายการรับชำระของผู้ใช้รายนี้");
+  return payment;
+}
+
+export async function listPaymentAttachments(userId: number, paymentId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  await getOwnedPaymentForAttachment(userId, paymentId);
+  return db.select({ id: paymentAttachments.id, paymentId: paymentAttachments.paymentId, originalFilename: paymentAttachments.originalFilename, mimeType: paymentAttachments.mimeType, sizeBytes: paymentAttachments.sizeBytes, caption: paymentAttachments.caption, createdAt: paymentAttachments.createdAt }).from(paymentAttachments).where(and(eq(paymentAttachments.userId, userId), eq(paymentAttachments.paymentId, paymentId), isNull(paymentAttachments.deletedAt))).orderBy(desc(paymentAttachments.createdAt)).limit(50);
+}
+
+export async function uploadPaymentAttachment(userId: number, input: { paymentId: number; originalFilename: string; caption?: string | null; dataUrl: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const payment = await getOwnedPaymentForAttachment(userId, input.paymentId);
+  if (payment.voidedAt) throw new Error("ไม่สามารถเพิ่มหลักฐานในรายการรับชำระที่ยกเลิกแล้ว");
+  const parsed = parsePaymentAttachmentDataUrl(input.dataUrl);
+  const originalFilename = sanitizePaymentAttachmentFilename(input.originalFilename);
+  const storageName = buildPaymentAttachmentStorageName(originalFilename, parsed.mimeType);
+  const uploaded = await storagePut(`payment-proofs/${userId}/${payment.id}/${storageName}`, parsed.bytes, parsed.mimeType);
+  try {
+    const insert = await db.insert(paymentAttachments).values({ userId, paymentId: payment.id, storageKey: uploaded.key, originalFilename, mimeType: parsed.mimeType, sizeBytes: parsed.bytes.length, caption: input.caption?.trim() || null });
+    const attachmentId = Number(insert[0].insertId);
+    await db.insert(receivableEvents).values(buildReceivableActivityEvent({ userId, receivableId: payment.receivableId, type: "payment-attachment-added", paymentId: payment.id, note: "เพิ่มหลักฐานการรับชำระ" }));
+    return { id: attachmentId, paymentId: payment.id, originalFilename, mimeType: parsed.mimeType, sizeBytes: parsed.bytes.length, caption: input.caption?.trim() || null, createdAt: new Date() };
+  } catch (error) {
+    // The S3 key is never exposed and has no DB reference if metadata persistence fails.
+    throw error;
+  }
+}
+
+export async function getPaymentAttachmentForView(userId: number, attachmentId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db.select({ id: paymentAttachments.id, paymentId: paymentAttachments.paymentId, storageKey: paymentAttachments.storageKey, originalFilename: paymentAttachments.originalFilename, mimeType: paymentAttachments.mimeType, sizeBytes: paymentAttachments.sizeBytes, caption: paymentAttachments.caption, createdAt: paymentAttachments.createdAt }).from(paymentAttachments).where(and(eq(paymentAttachments.id, attachmentId), eq(paymentAttachments.userId, userId), isNull(paymentAttachments.deletedAt))).limit(1);
+  const attachment = rows[0];
+  if (!attachment) throw new Error("ไม่พบหลักฐานการรับชำระของผู้ใช้รายนี้");
+  return attachment;
+}
+
+export async function softDeletePaymentAttachment(userId: number, attachmentId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.transaction(async (tx) => {
+    const rows = await tx.select({ id: paymentAttachments.id, paymentId: paymentAttachments.paymentId, storageKey: paymentAttachments.storageKey, receivableId: payments.receivableId }).from(paymentAttachments).innerJoin(payments, eq(paymentAttachments.paymentId, payments.id)).where(and(eq(paymentAttachments.id, attachmentId), eq(paymentAttachments.userId, userId), eq(payments.userId, userId), isNull(paymentAttachments.deletedAt))).limit(1);
+    const attachment = rows[0];
+    if (!attachment) throw new Error("ไม่พบหลักฐานการรับชำระของผู้ใช้รายนี้");
+    await tx.update(paymentAttachments).set({ deletedAt: new Date() }).where(and(eq(paymentAttachments.id, attachment.id), eq(paymentAttachments.userId, userId), isNull(paymentAttachments.deletedAt)));
+    await tx.insert(receivableEvents).values(buildReceivableActivityEvent({ userId, receivableId: attachment.receivableId, type: "payment-attachment-removed", paymentId: attachment.paymentId, note: "ลบหลักฐานการรับชำระ" }));
+    return { deleted: true as const };
+  });
 }
 
 export async function getReceivableByInvoice(userId: number, invoiceId: number) {

@@ -84,7 +84,7 @@ export function hasReceiptSourcePaymentChanged(createdPaymentIds: number[], paym
   return created.length !== current.length || created.some((id, index) => id !== current[index]) || moneyToCents(paymentTotalAtCreation) !== moneyToCents(paymentTotalNow);
 }
 
-export function buildReceivableActivityEvent(input: { userId: number; receivableId: number; type: "created" | "payment-recorded" | "payment-voided" | "payment-replaced" | "receipt-draft-created"; paymentId?: number | null; amount?: number | string | null; note?: string | null }) {
+export function buildReceivableActivityEvent(input: { userId: number; receivableId: number; type: "created" | "payment-recorded" | "payment-voided" | "payment-replaced" | "receipt-draft-created" | "payment-attachment-added" | "payment-attachment-removed"; paymentId?: number | null; amount?: number | string | null; note?: string | null }) {
   return {
     userId: input.userId,
     receivableId: input.receivableId,
