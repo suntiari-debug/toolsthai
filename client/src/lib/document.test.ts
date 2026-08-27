@@ -130,4 +130,14 @@ describe("document calculations", () => {
     expect(restored.stampScale).toBe(1.35);
     expect(restored.stampRotation).toBe(-12);
   });
+
+  it("keeps legacy payloads without a customer master link editable while preserving an optional customerId for new documents", () => {
+    const legacy = createInitialDocument("invoice");
+    const legacyPayload = JSON.stringify({ ...legacy, customer: { name: "ลูกค้าเดิม", address: "ที่อยู่เดิม", taxId: "", contact: "คุณเก่า" } });
+    const restoredLegacy = restoreDocument(legacyPayload, "invoice");
+    expect(restoredLegacy.customer).toEqual({ name: "ลูกค้าเดิม", address: "ที่อยู่เดิม", taxId: "", contact: "คุณเก่า" });
+    expect(restoredLegacy.customerId).toBeUndefined();
+    restoredLegacy.customerId = 44;
+    expect(convertDocument(restoredLegacy, "receipt").customerId).toBe(44);
+  });
 });

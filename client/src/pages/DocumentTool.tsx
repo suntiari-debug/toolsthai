@@ -20,6 +20,7 @@ import { createLogoPresetExport, filterLogoPresets, LEGACY_LOGO_PRESETS_STORAGE_
 import { getItemPreviewHighlightTarget, getPreviewHighlightTarget, type PreviewHighlightTarget } from "@/lib/previewHighlight";
 import { sanitizePdfFilename } from "@/lib/pdfExport";
 import { parseReceiptSourceContext } from "@/lib/receiptDraft";
+import CustomerPicker from "@/components/CustomerPicker";
 import "../styles/document-typography.css";
 import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollBehavior, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
 
@@ -450,7 +451,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
       if (isAuthenticated) {
         try {
           const persistable = makePersistableDocument();
-          await recordDocumentExport.mutateAsync({ kind: document.kind, documentNumber: document.documentNumber || makeDocumentNumber(kind), customerName: document.customer.name || undefined, payload: JSON.stringify(persistable), filename });
+          await recordDocumentExport.mutateAsync({ customerId: document.customerId ?? null, kind: document.kind, documentNumber: document.documentNumber || makeDocumentNumber(kind), customerName: document.customer.name || undefined, payload: JSON.stringify(persistable), filename });
           flashNotice("เริ่มดาวน์โหลด PDF และบันทึกประวัติในคลังเอกสารแล้ว");
         } catch {
           flashNotice("เริ่มดาวน์โหลด PDF แล้ว แต่ยังบันทึกประวัติไม่สำเร็จ");
@@ -503,7 +504,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const handleAccountSave = () => {
     if (!isAuthenticated) { startLogin(); return; }
     const persistable = makePersistableDocument();
-    saveDocument.mutate({ kind: document.kind, documentNumber: document.documentNumber || makeDocumentNumber(kind), customerName: document.customer.name || undefined, payload: JSON.stringify(persistable) });
+    saveDocument.mutate({ customerId: document.customerId ?? null, kind: document.kind, documentNumber: document.documentNumber || makeDocumentNumber(kind), customerName: document.customer.name || undefined, payload: JSON.stringify(persistable) });
   };
 
   return (
@@ -579,6 +580,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
 
             <section className="form-section">
               <CardHeading title="ลูกค้า / ผู้รับเอกสาร" />
+              {isAuthenticated ? <CustomerPicker customerId={document.customerId} onSelect={(customer) => { setDocument((current) => ({ ...current, customerId: customer.id, customer: { name: customer.name, address: customer.address || "", taxId: customer.taxId || "", contact: customer.contactName || "" } })); flashNotice(`เติมข้อมูลลูกค้า “${customer.name}” ในเอกสารแล้ว`); }} onClear={() => { updateDocument("customerId", undefined); flashNotice("ยกเลิกการเชื่อม Customer Master แล้ว ข้อมูลในเอกสารยังคงอยู่"); }} /> : null}
               <div className="field-grid"><FormField label="ชื่อ"><input data-preview-highlight="customer" value={document.customer.name} onChange={(event) => updateParty("customer", "name", event.target.value)} /></FormField><FormField label="ที่อยู่"><textarea data-preview-highlight="customer" rows={2} value={document.customer.address} onChange={(event) => updateParty("customer", "address", event.target.value)} /></FormField><div className="field-grid two-columns keep-on-mobile"><FormField label="เลขผู้เสียภาษี"><input data-preview-highlight="customer" value={document.customer.taxId} onChange={(event) => updateParty("customer", "taxId", event.target.value)} /></FormField><FormField label="ผู้ติดต่อ"><input data-preview-highlight="customer" value={document.customer.contact} onChange={(event) => updateParty("customer", "contact", event.target.value)} /></FormField></div></div>
             </section>
 

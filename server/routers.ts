@@ -9,6 +9,17 @@ import { receivablesRouter } from "./routers/receivables";
 
 const documentKind = z.enum(["quotation", "invoice", "receipt", "delivery-note", "tax-invoice"]);
 const documentStatus = z.enum(["draft", "sent", "paid", "overdue"]);
+const customerInput = z.object({
+  customerType: z.enum(["company", "person"]),
+  name: z.string().trim().min(1, "กรุณาระบุชื่อลูกค้า").max(255, "ชื่อลูกค้ายาวเกิน 255 ตัวอักษร"),
+  taxId: z.string().trim().regex(/^$|^\d{13}$/, "เลขประจำตัวผู้เสียภาษีต้องเป็นตัวเลข 13 หลัก").max(32).optional(),
+  address: z.string().trim().max(2_000, "ที่อยู่ยาวเกิน 2,000 ตัวอักษร").optional(),
+  contactName: z.string().trim().max(255, "ชื่อผู้ติดต่อยาวเกิน 255 ตัวอักษร").optional(),
+  phone: z.string().trim().max(64, "หมายเลขโทรศัพท์ยาวเกิน 64 ตัวอักษร").optional(),
+  email: z.string().trim().email("รูปแบบอีเมลไม่ถูกต้อง").max(320).or(z.literal("")).optional(),
+  note: z.string().trim().max(2_000, "หมายเหตุยาวเกิน 2,000 ตัวอักษร").optional(),
+});
+const customerListInput = z.object({ query: z.string().trim().max(120).optional(), archived: z.boolean().optional(), page: z.number().int().min(1).max(100_000).optional(), pageSize: z.number().int().min(1).max(50).optional() }).optional();
 const companyProfileInput = z.object({
   name: z.string().trim().min(1).max(255),
   address: z.string().trim().max(2000).optional(),
@@ -73,11 +84,18 @@ export const appRouter = router({
       return db.saveCompanyProfile({ userId: ctx.user.id, name: input.name, address: input.address || null, taxId: input.taxId || null, phone: input.phone || null, email: input.email || null, logoUrl, signatureUrl, stampUrl, signerName: input.signerName || null, signerPosition: input.signerPosition || null, defaultDocumentTemplate: input.defaultDocumentTemplate || null, defaultAccentColor: input.defaultAccentColor || null, defaultFontFamily: input.defaultFontFamily || null, defaultFontSize: input.defaultFontSize || null });
     }),
   }),
+  customers: router({
+    list: protectedProcedure.input(customerListInput).query(({ ctx, input }) => db.listCustomers(ctx.user.id, input)),
+    get: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => (await db.getCustomer(ctx.user.id, input.id)) ?? null),
+    create: protectedProcedure.input(customerInput).mutation(({ ctx, input }) => db.createCustomer(ctx.user.id, input)),
+    update: protectedProcedure.input(z.object({ id: z.number().int().positive(), customer: customerInput })).mutation(({ ctx, input }) => db.updateCustomer(ctx.user.id, input.id, input.customer)),
+    setArchived: protectedProcedure.input(z.object({ id: z.number().int().positive(), archived: z.boolean() })).mutation(({ ctx, input }) => db.setCustomerArchived(ctx.user.id, input.id, input.archived)),
+  }),
   receivables: receivablesRouter,
   documents: router({
     list: protectedProcedure.input(z.object({ kind: documentKind.optional(), status: documentStatus.optional(), archived: z.boolean().optional(), search: z.string().trim().max(120).optional() }).optional()).query(({ ctx, input }) => db.listSavedDocuments(ctx.user.id, input)),
     get: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => (await db.getSavedDocument(ctx.user.id, input.id)) ?? null),
-    save: protectedProcedure.input(z.object({ kind: documentKind, documentNumber: z.string().trim().min(1).max(64), customerName: z.string().trim().max(255).optional(), payload: z.string().min(2).max(60_000) })).mutation(async ({ ctx, input }) => {
+    save: protectedProcedure.input(z.object({ customerId: z.number().int().positive().nullable().optional(), kind: documentKind, documentNumber: z.string().trim().min(1).max(64), customerName: z.string().trim().max(255).optional(), payload: z.string().min(2).max(60_000) })).mutation(async ({ ctx, input }) => {
       await db.saveDocument({ userId: ctx.user.id, ...input });
       return { success: true } as const;
     }),
@@ -89,7 +107,7 @@ export const appRouter = router({
       await db.recordDocumentExport(ctx.user.id, input.documentId, input.filename);
       return { success: true } as const;
     }),
-    recordExportForDocument: protectedProcedure.input(z.object({ kind: documentKind, documentNumber: z.string().trim().min(1).max(64), customerName: z.string().trim().max(255).optional(), payload: z.string().min(2).max(60_000), filename: z.string().trim().min(5).max(255) })).mutation(({ ctx, input }) => db.recordDocumentExportForDocument({ userId: ctx.user.id, ...input })),
+    recordExportForDocument: protectedProcedure.input(z.object({ customerId: z.number().int().positive().nullable().optional(), kind: documentKind, documentNumber: z.string().trim().min(1).max(64), customerName: z.string().trim().max(255).optional(), payload: z.string().min(2).max(60_000), filename: z.string().trim().min(5).max(255) })).mutation(({ ctx, input }) => db.recordDocumentExportForDocument({ userId: ctx.user.id, ...input })),
   }),
 });
 

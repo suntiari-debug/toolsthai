@@ -11,6 +11,7 @@ import CalculatorTool from "./pages/CalculatorTool";
 import Account from "./pages/Account";
 import DocumentTool from "./pages/DocumentTool";
 import DocumentCenter from "./pages/DocumentCenter";
+import CustomersPage from "./pages/CustomersPage";
 import Home from "./pages/Home";
 import ToolDirectory from "./pages/ToolDirectory";
 
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/tools" component={ToolDirectory} />
       <Route path="/account" component={Account} />
       <Route path="/documents" component={DocumentCenter} />
+      <Route path="/customers" component={CustomersPage} />
       <Route path="/receivables" component={ReceivablesDashboard} />
       <Route path="/receivables/report" component={ReceivablesAgingReport} />
       <Route path="/quotation">{() => <DocumentTool kind="quotation" />}</Route>

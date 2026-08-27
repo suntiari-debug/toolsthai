@@ -56,6 +56,8 @@ export function boundedStampRotation(rotation: number) {
 
 export type BusinessDocument = {
   kind: DocumentKind;
+  /** Optional owner-scoped Customer Master link. Legacy payloads omit it and keep their own customer snapshot. */
+  customerId?: number;
   documentNumber: string;
   issueDate: string;
   dueDate: string;
