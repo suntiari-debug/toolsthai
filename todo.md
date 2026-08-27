@@ -81,3 +81,10 @@
 - [x] เพิ่ม tests MIME/size/owner authorization/delete semantics/audit และ browser QA upload-view-delete ด้วย test fixture เท่านั้น
 - [x] เพิ่ม direct attachment list contract และ test ว่า owner อื่นอ่านไม่ได้หรือรับ storageKey ไม่ได้
 - [x] ตรวจ regression, commit/push และสร้าง checkpoint payment attachments หลังผ่าน QA
+- [x] ตรวจ document save/persistence, export history, receipt metadata และ UI integration points สำหรับ version history
+- [x] เพิ่ม document revision schema แบบ additive พร้อม migration review/apply/verify, pagination และ retention policy
+- [x] เพิ่ม owner-scoped revision create/list/preview/restore-as-new โดยไม่แก้ revision/export/receipt source เดิม
+- [x] เพิ่ม revision list metadata แบบ pagination/lazy preview และยืนยัน retention แบบ non-destructive ใน contract/tests
+- [x] เพิ่ม Version History drawer ใน Document Center และ editor พร้อม field summary, read-only preview และ restore confirm
+- [x] เพิ่ม tests immutable restore/non-owner/export+receipt preservation/legacy fallback และ browser QA desktop/mobile
+- [ ] รัน full regression, commit/push และสร้าง checkpoint document version history หลังผ่าน QA

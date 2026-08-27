@@ -8,6 +8,7 @@ import { openReceiptPreparation, ReceiptPreparationPortal } from "@/components/R
 import { trpc } from "@/lib/trpc";
 import { getReceivableEventLabel, type ReceivableEventType } from "@shared/receivableTimeline";
 import ReceivableReminderInbox from "@/components/ReceivableReminderInbox";
+import DocumentVersionHistoryDrawer from "@/components/DocumentVersionHistoryDrawer";
 
 type DocumentKind = "quotation" | "invoice" | "receipt" | "delivery-note" | "tax-invoice";
 type DocumentStatus = "draft" | "sent" | "paid" | "overdue";
@@ -28,6 +29,7 @@ export default function DocumentCenter() {
   const [status, setStatus] = useState<"all" | DocumentStatus>("all");
   const [archived, setArchived] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [revisionDocumentId, setRevisionDocumentId] = useState<number | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<number | null>(null);
   const [reminderInvoiceId, setReminderInvoiceId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
@@ -43,6 +45,7 @@ export default function DocumentCenter() {
   const duplicate = trpc.documents.duplicate.useMutation({ onSuccess: () => { invalidate(); setFeedback("ทำสำเนาเอกสารเป็นฉบับร่างแล้ว"); }, onError: () => setFeedback("ไม่สามารถทำสำเนาเอกสารได้ กรุณาลองใหม่") });
   const openEditor = (item: { kind: DocumentKind; payload: string }) => {
     window.sessionStorage.setItem("toolsThai.convertedDocument", item.payload);
+    if ("id" in item && typeof item.id === "number") window.sessionStorage.setItem("toolsThai.resumeDocumentId", String(item.id));
     setLocation(`/${item.kind}`);
   };
   useEffect(() => {
@@ -95,12 +98,14 @@ export default function DocumentCenter() {
           <label className="row-status-select"><Send size={15} /><span className="sr-only">เปลี่ยนสถานะ</span><select value={item.status} disabled={updateStatus.isPending} onChange={(event) => updateStatus.mutate({ id: item.id, status: event.target.value as DocumentStatus })}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <button type="button" className="row-action" disabled={duplicate.isPending} onClick={() => duplicate.mutate({ id: item.id })}><Copy size={15} /> ทำสำเนา</button>
           <button type="button" className="row-action" disabled={setArchivedMutation.isPending} onClick={() => setArchivedMutation.mutate({ id: item.id, archived: !item.archivedAt })}>{item.archivedAt ? <Undo2 size={15} /> : <Archive size={15} />}{item.archivedAt ? "กู้คืน" : "เก็บถาวร"}</button>
-          <button type="button" className="row-action" onClick={() => setSelectedId(item.id)}><History size={15} /> PDF</button>
+          <button type="button" className="row-action" onClick={() => setRevisionDocumentId(item.id)}><History size={15} /> รุ่น</button>
+          <button type="button" className="row-action" onClick={() => setSelectedId(item.id)}><FileClock size={15} /> PDF</button>
         </div>
       </article>)}
     </section>
 
     {selected && <div className="document-history-drawer" role="dialog" aria-modal="true" aria-labelledby="document-history-title"><div className="document-history-backdrop" onClick={() => setSelectedId(null)} /><section className="document-history-panel"><header><div><p className="eyebrow">PDF export history</p><h2 id="document-history-title">{selected.documentNumber}</h2></div><button type="button" className="icon-close" aria-label="ปิดประวัติ PDF" onClick={() => setSelectedId(null)}><MoreHorizontal /></button></header>{exportsQuery.isLoading ? <p className="history-state"><Loader2 className="animate-spin" /> กำลังโหลดประวัติ</p> : exportsQuery.isError ? <p className="history-state">ไม่สามารถโหลดประวัติ PDF ได้ <button type="button" className="row-action" onClick={() => void exportsQuery.refetch()}>ลองใหม่</button></p> : (exportsQuery.data?.length ? <ol className="export-history-list">{exportsQuery.data.map((entry) => <li key={entry.id}><FileText size={17} /><div><strong>{entry.filename}</strong><span>{formatDate(entry.createdAt)}</span></div></li>)}</ol> : <p className="history-state">ยังไม่มีประวัติการส่งออก PDF สำหรับเอกสารนี้</p>)}</section></div>}
+    {revisionDocumentId !== null && documents.find((item) => item.id === revisionDocumentId) ? <DocumentVersionHistoryDrawer documentId={revisionDocumentId} documentNumber={documents.find((item) => item.id === revisionDocumentId)!.documentNumber} kind={documents.find((item) => item.id === revisionDocumentId)!.kind} onClose={() => setRevisionDocumentId(null)} onRestored={() => { invalidate(); setFeedback("สร้าง revision ใหม่จากรุ่นที่เลือกแล้ว"); }} /> : null}
 
     {selectedInvoice && <div className="document-history-drawer" role="dialog" aria-modal="true" aria-labelledby="document-receivable-title"><div className="document-history-backdrop" onClick={() => setSelectedInvoiceId(null)} /><section className="document-history-panel document-receivable-panel"><header><div><p className="eyebrow">Receivable timeline</p><h2 id="document-receivable-title">{selectedInvoice.documentNumber}</h2></div><button type="button" className="icon-close" aria-label="ปิดสถานะรับชำระ" onClick={() => setSelectedInvoiceId(null)}><MoreHorizontal /></button></header>{receivableQuery.isLoading ? <p className="history-state"><Loader2 className="animate-spin" /> กำลังโหลดสถานะรับชำระ</p> : receivableQuery.isError ? <p className="history-state">ไม่สามารถโหลดสถานะรับชำระได้ <button type="button" className="row-action" onClick={() => void receivableQuery.refetch()}>ลองใหม่</button></p> : !receivable ? <div className="history-state"><CircleDollarSign size={20} /> ยังไม่ได้เพิ่มใบแจ้งหนี้นี้ในรายการลูกหนี้ <Link className="row-action" href="/receivables">ไปติดตามรับชำระ</Link></div> : <><div className="document-receivable-summary"><span>ยอดเอกสาร<strong>{formatTHB(Number(receivable.totalAmount))}</strong></span><span>ยอดคงเหลือ<strong>{formatTHB(receivableBalance)}</strong></span><span>สถานะ<strong>{receivableStatusLabels[receivable.status as ReceivableStatus]}</strong></span></div><div className="document-receipt-action"><div><ReceiptText size={17} /><span><strong>{receiptIsAvailable ? "พร้อมออกใบเสร็จ" : "ยังไม่พร้อมออกใบเสร็จ"}</strong><small>{receiptIsAvailable ? "สร้างหรือเปิดฉบับร่างจากการชำระครบ" : "ออกใบเสร็จได้เมื่อยอดคงเหลือเป็น ฿0.00"}</small></span></div><button type="button" className="row-action" disabled={!receiptIsAvailable} onClick={() => openReceiptPreparation(receivable.id)}><ReceiptText size={15} /> เปิดฉบับร่างใบเสร็จ</button></div><ol className="document-receivable-timeline">{receivable.events.map((event) => <li key={event.id}><CircleDollarSign size={15} /><div><strong>{getReceivableEventLabel(event.type as ReceivableEventType)}</strong><span>{formatDate(event.createdAt)}{event.note ? ` · ${event.note}` : ""}</span></div>{event.amount ? <b>{formatTHB(Number(event.amount))}</b> : null}</li>)}</ol><Link className="row-action document-receivable-link" href="/receivables">เปิด Dashboard รับชำระ</Link></>}</section></div>}
   </main><ReceiptPreparationPortal /></div>;

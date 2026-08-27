@@ -80,6 +80,21 @@ export const documentExports = mysqlTable("document_exports", {
   userDocumentCreatedIdx: index("document_exports_user_document_created_idx").on(table.userId, table.documentId, table.createdAt),
 }));
 
+/** Immutable save-time snapshots. Retention is non-destructive; list APIs page metadata and load payload only for an explicit preview. */
+export const documentRevisions = mysqlTable("document_revisions", {
+  id: int("id").autoincrement().primaryKey(),
+  documentId: int("documentId").notNull().references(() => savedDocuments.id, { onDelete: "cascade" }),
+  ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  actorId: int("actorId").references(() => users.id, { onDelete: "set null" }),
+  revisionNumber: int("revisionNumber").notNull(),
+  summary: varchar("summary", { length: 500 }).notNull(),
+  payload: text("payload").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  documentRevisionUnique: uniqueIndex("document_revisions_document_revision_unique").on(table.documentId, table.revisionNumber),
+  ownerDocumentCreatedIdx: index("document_revisions_owner_document_created_idx").on(table.ownerId, table.documentId, table.createdAt),
+}));
+
 export const receiptSources = mysqlTable("receipt_sources", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -211,6 +226,7 @@ export type Payment = typeof payments.$inferSelect;
 export type PaymentAttachment = typeof paymentAttachments.$inferSelect;
 export type ReceivableEvent = typeof receivableEvents.$inferSelect;
 export type DocumentExport = typeof documentExports.$inferSelect;
+export type DocumentRevision = typeof documentRevisions.$inferSelect;
 export type ReceiptSource = typeof receiptSources.$inferSelect;
 export type Customer = typeof customers.$inferSelect;
 export type ReceivableReminderSetting = typeof receivableReminderSettings.$inferSelect;

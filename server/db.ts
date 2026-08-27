@@ -1,12 +1,13 @@
 import { and, desc, eq, gte, inArray, isNull, like, lt, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { companyProfiles, customers, documentExports, InsertUser, paymentAttachments, payments, receivableEvents, receivableReminderSettings, receivableReminders, receivables, receiptSources, savedDocuments, users } from "../drizzle/schema";
+import { companyProfiles, customers, documentExports, documentRevisions, InsertUser, paymentAttachments, payments, receivableEvents, receivableReminderSettings, receivableReminders, receivables, receiptSources, savedDocuments, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { buildReceivableActivityEvent, calculateInvoiceTotal, centsToMoney, deriveReceivableStatus, getReceiptDraftEligibility, hasReceiptSourcePaymentChanged, moneyToCents, parseDateOnly, parseInvoicePayload, validatePaymentAmount } from "./receivables";
 import { buildReceivableAgingReport, getMonthBounds } from "./agingReport";
 import { getReminderCandidate, parseReminderDays, REMINDER_TIMEZONE, serializeReminderDays } from "./receivableReminders";
 import { buildPaymentAttachmentStorageName, parsePaymentAttachmentDataUrl, sanitizePaymentAttachmentFilename, type PaymentAttachmentMimeType } from "./paymentAttachments";
 import { storageGetSignedUrl, storagePut } from "./storage";
+import { clampDocumentRevisionPage, getRestoredDocumentFields, summarizeDocumentRevision } from "./documentRevisions";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -175,11 +176,78 @@ export async function setCustomerArchived(userId: number, customerId: number, ar
   return customer;
 }
 
-export async function saveDocument(input: { userId: number; customerId?: number | null; kind: "quotation" | "invoice" | "receipt" | "delivery-note" | "tax-invoice"; documentNumber: string; customerName?: string; payload: string }) {
+export async function saveDocument(input: { userId: number; actorId?: number | null; documentId?: number | null; customerId?: number | null; kind: "quotation" | "invoice" | "receipt" | "delivery-note" | "tax-invoice"; documentNumber: string; customerName?: string; payload: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   if (input.customerId) await assertCustomerOwnership(input.userId, input.customerId);
-  await db.insert(savedDocuments).values(input);
+  return db.transaction(async (tx) => {
+    let documentId = input.documentId || null;
+    let previousPayload: string | null = null;
+    if (documentId) {
+      const existing = await tx.select({ id: savedDocuments.id, payload: savedDocuments.payload }).from(savedDocuments).where(and(eq(savedDocuments.id, documentId), eq(savedDocuments.userId, input.userId), eq(savedDocuments.kind, input.kind))).limit(1);
+      if (!existing[0]) throw new Error("ไม่พบเอกสารของผู้ใช้รายนี้");
+      previousPayload = existing[0].payload;
+      await tx.update(savedDocuments).set({ customerId: input.customerId ?? null, documentNumber: input.documentNumber, customerName: input.customerName || null, payload: input.payload }).where(and(eq(savedDocuments.id, documentId), eq(savedDocuments.userId, input.userId)));
+    } else {
+      const inserted = await tx.insert(savedDocuments).values({ userId: input.userId, customerId: input.customerId ?? null, kind: input.kind, documentNumber: input.documentNumber, customerName: input.customerName || null, payload: input.payload });
+      documentId = Number(inserted[0].insertId);
+    }
+    const revisionRows = await tx.select({ latest: sql<number>`coalesce(max(${documentRevisions.revisionNumber}), 0)` }).from(documentRevisions).where(and(eq(documentRevisions.documentId, documentId), eq(documentRevisions.ownerId, input.userId))).limit(1);
+    let revisionNumber = Number(revisionRows[0]?.latest || 0);
+    if (revisionNumber === 0 && previousPayload !== null) {
+      revisionNumber = 1;
+      await tx.insert(documentRevisions).values({ documentId, ownerId: input.userId, actorId: input.actorId ?? input.userId, revisionNumber, summary: "เก็บ snapshot ก่อนเริ่มประวัติรุ่นเอกสาร", payload: previousPayload });
+    }
+    revisionNumber += 1;
+    await tx.insert(documentRevisions).values({ documentId, ownerId: input.userId, actorId: input.actorId ?? input.userId, revisionNumber, summary: summarizeDocumentRevision(previousPayload, input.payload, input.documentNumber), payload: input.payload });
+    return { documentId, revisionNumber };
+  });
+}
+
+async function assertSavedDocumentOwnership(userId: number, documentId: number) {
+  const document = await getSavedDocument(userId, documentId);
+  if (!document) throw new Error("ไม่พบเอกสารของผู้ใช้รายนี้");
+  return document;
+}
+
+export async function listDocumentRevisions(userId: number, documentId: number, input: { page?: number; pageSize?: number } = {}) {
+  const db = await getDb();
+  const { page, pageSize } = clampDocumentRevisionPage(input);
+  if (!db) return { items: [], total: 0, page, pageSize };
+  await assertSavedDocumentOwnership(userId, documentId);
+  const conditions = and(eq(documentRevisions.ownerId, userId), eq(documentRevisions.documentId, documentId));
+  const [countRows, items] = await Promise.all([
+    db.select({ total: sql<number>`count(*)` }).from(documentRevisions).where(conditions).limit(1),
+    db.select({ id: documentRevisions.id, revisionNumber: documentRevisions.revisionNumber, summary: documentRevisions.summary, createdAt: documentRevisions.createdAt, actorId: documentRevisions.actorId }).from(documentRevisions).where(conditions).orderBy(desc(documentRevisions.revisionNumber)).limit(pageSize).offset((page - 1) * pageSize),
+  ]);
+  return { items, total: Number(countRows[0]?.total || 0), page, pageSize };
+}
+
+export async function getDocumentRevisionPreview(userId: number, documentId: number, revisionId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select({ id: documentRevisions.id, documentId: documentRevisions.documentId, revisionNumber: documentRevisions.revisionNumber, summary: documentRevisions.summary, payload: documentRevisions.payload, createdAt: documentRevisions.createdAt, actorId: documentRevisions.actorId }).from(documentRevisions).where(and(eq(documentRevisions.id, revisionId), eq(documentRevisions.documentId, documentId), eq(documentRevisions.ownerId, userId))).limit(1);
+  return rows[0];
+}
+
+export async function restoreDocumentRevision(userId: number, actorId: number, documentId: number, revisionId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.transaction(async (tx) => {
+    const documentRows = await tx.select({ id: savedDocuments.id, kind: savedDocuments.kind, documentNumber: savedDocuments.documentNumber, customerName: savedDocuments.customerName, customerId: savedDocuments.customerId, payload: savedDocuments.payload }).from(savedDocuments).where(and(eq(savedDocuments.id, documentId), eq(savedDocuments.userId, userId))).limit(1);
+    const document = documentRows[0];
+    if (!document) throw new Error("ไม่พบเอกสารของผู้ใช้รายนี้");
+    const revisionRows = await tx.select({ id: documentRevisions.id, revisionNumber: documentRevisions.revisionNumber, payload: documentRevisions.payload }).from(documentRevisions).where(and(eq(documentRevisions.id, revisionId), eq(documentRevisions.documentId, documentId), eq(documentRevisions.ownerId, userId))).limit(1);
+    const revision = revisionRows[0];
+    if (!revision) throw new Error("ไม่พบรุ่นเอกสารของผู้ใช้รายนี้");
+    const restored = getRestoredDocumentFields(revision.payload, document);
+    if (restored.customerId) await assertCustomerOwnership(userId, restored.customerId);
+    await tx.update(savedDocuments).set({ payload: revision.payload, documentNumber: restored.documentNumber, customerName: restored.customerName, customerId: restored.customerId }).where(and(eq(savedDocuments.id, documentId), eq(savedDocuments.userId, userId)));
+    const revisionNumberRows = await tx.select({ latest: sql<number>`coalesce(max(${documentRevisions.revisionNumber}), 0)` }).from(documentRevisions).where(and(eq(documentRevisions.documentId, documentId), eq(documentRevisions.ownerId, userId))).limit(1);
+    const revisionNumber = Number(revisionNumberRows[0]?.latest || 0) + 1;
+    await tx.insert(documentRevisions).values({ documentId, ownerId: userId, actorId, revisionNumber, summary: `สร้างฉบับใหม่จากรุ่นที่ ${revision.revisionNumber}`, payload: revision.payload });
+    return { documentId, revisionNumber, payload: revision.payload, kind: document.kind };
+  });
 }
 
 export type SavedDocumentStatus = "draft" | "sent" | "paid" | "overdue";

@@ -1,6 +1,6 @@
 import { ChangeEvent, type CSSProperties, TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, ArrowRight, Download, Eye, EyeOff, FileDown, FilePlus2, Info, Plus, Printer, RotateCcw, Save, Search, ShieldCheck, Tags, Trash2, Undo2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Eye, EyeOff, FileDown, FilePlus2, History, Info, Plus, Printer, RotateCcw, Save, Search, ShieldCheck, Tags, Trash2, Undo2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
 import PublicFooter from "@/components/PublicFooter";
 import PublicHeader from "@/components/PublicHeader";
 import DocumentPreview from "@/components/DocumentPreview";
@@ -21,6 +21,7 @@ import { getItemPreviewHighlightTarget, getPreviewHighlightTarget, type PreviewH
 import { sanitizePdfFilename } from "@/lib/pdfExport";
 import { parseReceiptSourceContext } from "@/lib/receiptDraft";
 import CustomerPicker from "@/components/CustomerPicker";
+import DocumentVersionHistoryDrawer from "@/components/DocumentVersionHistoryDrawer";
 import "../styles/document-typography.css";
 import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollBehavior, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
 
@@ -48,6 +49,8 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const [, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
   const [document, setDocument] = useState<BusinessDocument>(() => createHydrationSafeInitialDocument(kind));
+  const [persistedDocumentId, setPersistedDocumentId] = useState<number | null>(null);
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [pdfExportStage, setPdfExportStage] = useState<PdfExportStage | null>(null);
@@ -86,7 +89,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     window.setTimeout(() => setNotice(""), 3200);
   };
   const saveDocument = trpc.documents.save.useMutation({
-    onSuccess: () => flashNotice("บันทึกเอกสารเข้าบัญชีของคุณแล้ว"),
+    onSuccess: (result) => { setPersistedDocumentId(result.documentId); flashNotice("บันทึกเอกสารเข้าบัญชีของคุณแล้ว"); },
     onError: () => flashNotice("ไม่สามารถบันทึกเอกสารได้ กรุณาลองใหม่อีกครั้ง"),
   });
   const recordDocumentExport = trpc.documents.recordExportForDocument.useMutation();
@@ -273,15 +276,20 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
 
   useEffect(() => {
     const saved = window.sessionStorage.getItem("toolsThai.convertedDocument");
+    const savedDocumentId = Number(window.sessionStorage.getItem("toolsThai.resumeDocumentId"));
     if (saved) {
       try {
         setDocument(restoreDocument(saved, kind));
+        setPersistedDocumentId(Number.isInteger(savedDocumentId) && savedDocumentId > 0 ? savedDocumentId : null);
         window.sessionStorage.removeItem("toolsThai.convertedDocument");
+        window.sessionStorage.removeItem("toolsThai.resumeDocumentId");
         return;
       } catch {
         window.sessionStorage.removeItem("toolsThai.convertedDocument");
+        window.sessionStorage.removeItem("toolsThai.resumeDocumentId");
       }
     }
+    setPersistedDocumentId(null);
     setDocument(createInitialDocument(kind));
   }, [kind]);
 
@@ -479,6 +487,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
 
   const handleConvert = (target: DocumentKind) => {
     window.sessionStorage.setItem("toolsThai.convertedDocument", JSON.stringify(convertDocument(document, target)));
+    window.sessionStorage.removeItem("toolsThai.resumeDocumentId");
     setLocation(`/${target}`);
   };
   const handleDraft = () => {
@@ -504,7 +513,12 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const handleAccountSave = () => {
     if (!isAuthenticated) { startLogin(); return; }
     const persistable = makePersistableDocument();
-    saveDocument.mutate({ customerId: document.customerId ?? null, kind: document.kind, documentNumber: document.documentNumber || makeDocumentNumber(kind), customerName: document.customer.name || undefined, payload: JSON.stringify(persistable) });
+    saveDocument.mutate({ documentId: persistedDocumentId, customerId: document.customerId ?? null, kind: document.kind, documentNumber: document.documentNumber || makeDocumentNumber(kind), customerName: document.customer.name || undefined, payload: JSON.stringify(persistable) });
+  };
+  const restoreFromRevision = async ({ payload, revisionNumber }: { payload: string; revisionNumber: number }) => {
+    setDocument(restoreDocument(payload, kind));
+    setIsVersionHistoryOpen(false);
+    flashNotice(`สร้าง revision ใหม่จากรุ่นที่เลือกแล้ว (รุ่นที่ ${revisionNumber})`);
   };
 
   return (
@@ -518,6 +532,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
             <button type="button" className="button button-download" onClick={requestPdfExport} disabled={isExporting}><FileDown size={17} /> {isExporting ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
             <button type="button" className="workspace-action" onClick={() => window.print()}><Printer size={16} /> พิมพ์</button>
             <button type="button" className="workspace-action text-action" onClick={handleReset}><RotateCcw size={16} /> รีเซ็ต</button>
+            {persistedDocumentId !== null && <button type="button" className="workspace-action" onClick={() => setIsVersionHistoryOpen(true)}><History size={16} /> รุ่นเอกสาร</button>}
             <button type="button" className="workspace-action save-action" onClick={handleAccountSave} disabled={saveDocument.isPending}><Save size={16} /> {isAuthenticated ? (saveDocument.isPending ? "กำลังบันทึก" : "บันทึก") : "บันทึก"}</button>
           </div>
           <span className="autosave-status"><span>✓</span> บันทึกอัตโนมัติในอุปกรณ์</span>
@@ -617,6 +632,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
         <DocumentSeoContent kind={kind} />
       </main>
       <PublicFooter />
+      {isVersionHistoryOpen && persistedDocumentId !== null ? <DocumentVersionHistoryDrawer documentId={persistedDocumentId} documentNumber={document.documentNumber || meta.title} kind={kind} onClose={() => setIsVersionHistoryOpen(false)} onRestored={restoreFromRevision} /> : null}
     </div>
   );
 }
