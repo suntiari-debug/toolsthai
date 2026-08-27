@@ -73,4 +73,4 @@
 - [x] เพิ่ม tests validation/search/pagination/owner/archive/legacy-document และ browser QA desktop/mobile
 - [x] เพิ่ม automated backend tests สำหรับ customer search ตามชื่อ เลขภาษี ผู้ติดต่อ และ owner scope
 - [x] เพิ่ม automated backend tests สำหรับ pagination page 1/page 2, ordering และจำนวนรายการต่อหน้า
-- [ ] ตรวจ regression, commit/push และสร้าง checkpoint Customer Master หลังผ่าน QA
+- [x] ตรวจ regression, commit/push และสร้าง checkpoint Customer Master หลังผ่าน QA
