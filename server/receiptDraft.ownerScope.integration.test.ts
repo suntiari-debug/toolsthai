@@ -6,9 +6,11 @@ import { __setDbForTests, createReceiptDraft, getReceiptEligibility } from "./db
 const databaseUrl = process.env.DATABASE_URL;
 const integration = databaseUrl ? describe : describe.skip;
 let connection: Connection | null = null;
+let fixtureOpenIds: string[] = [];
 
 integration("receipt draft owner scope with a transaction fixture", () => {
   beforeEach(async () => {
+    fixtureOpenIds = [];
     connection = await createConnection(databaseUrl!);
     await connection.beginTransaction();
     __setDbForTests(drizzle(connection));
@@ -18,6 +20,7 @@ integration("receipt draft owner scope with a transaction fixture", () => {
     __setDbForTests(null);
     if (connection) {
       await connection.rollback();
+      if (fixtureOpenIds.length) await connection.execute(`DELETE FROM users WHERE openId IN (${fixtureOpenIds.map(() => "?").join(",")})`, fixtureOpenIds);
       await connection.end();
       connection = null;
     }
@@ -25,7 +28,8 @@ integration("receipt draft owner scope with a transaction fixture", () => {
 
   it("creates only for the owner, reopens the same draft, and rejects a different owner", async () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
-    const [owners] = await connection!.execute<ResultSetHeader>("INSERT INTO users (`openId`, `role`) VALUES (?, 'user'), (?, 'user')", [`receipt-owner-${suffix}`, `receipt-other-${suffix}`]);
+    fixtureOpenIds = [`receipt-owner-${suffix}`, `receipt-other-${suffix}`];
+    const [owners] = await connection!.execute<ResultSetHeader>("INSERT INTO users (`openId`, `role`) VALUES (?, 'user'), (?, 'user')", fixtureOpenIds);
     const ownerId = Number(owners.insertId);
     const otherId = ownerId + 1;
     const invoicePayload = JSON.stringify({ kind: "invoice", documentNumber: `IV-TEST-${suffix}`, issueDate: "2026-08-27", dueDate: "2026-09-03", company: { name: "Test Co." }, customer: { name: "Owner Customer" }, items: [{ quantity: 1, unitPrice: 1000 }], discount: 0, vatRate: 0, vatMode: "none" });

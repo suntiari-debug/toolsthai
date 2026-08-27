@@ -1,4 +1,4 @@
-import { decimal, index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { boolean, decimal, index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -94,6 +94,45 @@ export const receivables = mysqlTable("receivables", {
   dueDateIdx: index("receivables_due_date_idx").on(table.userId, table.dueDate),
 }));
 
+/** User-owned opt-in preferences and the lifecycle key for one daily reminder schedule. */
+export const receivableReminderSettings = mysqlTable("receivable_reminder_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  enabled: boolean("enabled").notNull().default(false),
+  daysBeforeDue: varchar("daysBeforeDue", { length: 32 }).notNull().default("1,3,7"),
+  timezone: varchar("timezone", { length: 64 }).notNull().default("Asia/Bangkok"),
+  scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }).unique(),
+  lastEvaluatedAt: timestamp("lastEvaluatedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
+ * Both the end-user inbox and immutable reminder audit/dedupe ledger.  A unique
+ * owner/receivable/type/local-date tuple makes repeated/retried evaluations safe.
+ */
+export const receivableReminders = mysqlTable("receivable_reminders", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  receivableId: int("receivableId").notNull().references(() => receivables.id, { onDelete: "cascade" }),
+  invoiceId: int("invoiceId").notNull().references(() => savedDocuments.id, { onDelete: "cascade" }),
+  reminderType: mysqlEnum("reminderType", ["due-soon", "overdue"]).notNull(),
+  dueDate: timestamp("dueDate").notNull(),
+  dueDateBasis: varchar("dueDateBasis", { length: 10 }).notNull(),
+  evaluationDate: varchar("evaluationDate", { length: 10 }).notNull(),
+  outstandingAmount: decimal("outstandingAmount", { precision: 14, scale: 2 }).notNull(),
+  documentNumber: varchar("documentNumber", { length: 64 }).notNull(),
+  customerName: varchar("customerName", { length: 255 }).notNull(),
+  status: mysqlEnum("status", ["unread", "read"]).notNull().default("unread"),
+  readAt: timestamp("readAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  userStatusCreatedIdx: index("reminder_user_status_created_idx").on(table.userId, table.status, table.createdAt),
+  userTypeCreatedIdx: index("reminder_user_type_created_idx").on(table.userId, table.reminderType, table.createdAt),
+  userReceivableIdx: index("reminder_user_receivable_idx").on(table.userId, table.receivableId),
+  dailyDedupeUnique: uniqueIndex("reminder_user_receivable_type_day_unique").on(table.userId, table.receivableId, table.reminderType, table.evaluationDate),
+}));
+
 export const payments = mysqlTable("payments", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -131,3 +170,5 @@ export type Payment = typeof payments.$inferSelect;
 export type ReceivableEvent = typeof receivableEvents.$inferSelect;
 export type DocumentExport = typeof documentExports.$inferSelect;
 export type ReceiptSource = typeof receiptSources.$inferSelect;
+export type ReceivableReminderSetting = typeof receivableReminderSettings.$inferSelect;
+export type ReceivableReminder = typeof receivableReminders.$inferSelect;

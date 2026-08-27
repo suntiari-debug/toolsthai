@@ -1,9 +1,10 @@
-import { and, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, ne, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { companyProfiles, documentExports, InsertUser, payments, receivableEvents, receivables, receiptSources, savedDocuments, users } from "../drizzle/schema";
+import { companyProfiles, documentExports, InsertUser, payments, receivableEvents, receivableReminderSettings, receivableReminders, receivables, receiptSources, savedDocuments, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { buildReceivableActivityEvent, calculateInvoiceTotal, centsToMoney, deriveReceivableStatus, getReceiptDraftEligibility, hasReceiptSourcePaymentChanged, moneyToCents, parseDateOnly, parseInvoicePayload, validatePaymentAmount } from "./receivables";
 import { buildReceivableAgingReport, getMonthBounds } from "./agingReport";
+import { getReminderCandidate, parseReminderDays, REMINDER_TIMEZONE, serializeReminderDays } from "./receivableReminders";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -22,6 +23,11 @@ export async function getDb() {
 /** Test-only seam for transaction-scoped integration fixtures; never used by routers or client code. */
 export function __setDbForTests(instance: ReturnType<typeof drizzle> | null) {
   _db = instance;
+}
+
+function isDuplicateKeyError(error: unknown) {
+  const candidate = error as { code?: string; cause?: { code?: string } };
+  return candidate?.code === "ER_DUP_ENTRY" || candidate?.cause?.code === "ER_DUP_ENTRY";
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
@@ -163,7 +169,88 @@ export async function listReceivables(userId: number) {
   const overdueCents = items.filter((row) => row.status === "overdue").reduce((sum, row) => sum + Math.max(0, toCents(row.totalAmount) - toCents(row.paidAmount)), 0);
   const dueSoonAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const dueSoonCents = items.filter((row) => row.status !== "paid" && row.status !== "cancelled" && row.dueDate >= now && row.dueDate <= dueSoonAt).reduce((sum, row) => sum + Math.max(0, toCents(row.totalAmount) - toCents(row.paidAmount)), 0);
-  return { items, summary: { total: fromCents(totalCents), outstanding: fromCents(outstandingCents), overdue: fromCents(overdueCents), dueSoon: fromCents(dueSoonCents), collectedThisMonth: String(collected[0]?.total || "0.00") } };
+  const overdueCount = items.filter((row) => row.status === "overdue").length;
+  const dueSoonCount = items.filter((row) => row.status !== "paid" && row.status !== "cancelled" && row.dueDate >= now && row.dueDate <= dueSoonAt).length;
+  return { items, summary: { total: fromCents(totalCents), outstanding: fromCents(outstandingCents), overdue: fromCents(overdueCents), dueSoon: fromCents(dueSoonCents), overdueCount, dueSoonCount, collectedThisMonth: String(collected[0]?.total || "0.00") } };
+}
+
+export type ReminderSettingsInput = {
+  enabled: boolean;
+  daysBeforeDue: number[];
+  timezone: typeof REMINDER_TIMEZONE;
+  scheduleCronTaskUid?: string | null;
+};
+
+export async function getReceivableReminderSettings(userId: number) {
+  const db = await getDb();
+  if (!db) return { id: null, userId, enabled: false, daysBeforeDue: [1, 3, 7], timezone: REMINDER_TIMEZONE, scheduleCronTaskUid: null, lastEvaluatedAt: null };
+  const rows = await db.select({ id: receivableReminderSettings.id, userId: receivableReminderSettings.userId, enabled: receivableReminderSettings.enabled, daysBeforeDue: receivableReminderSettings.daysBeforeDue, timezone: receivableReminderSettings.timezone, scheduleCronTaskUid: receivableReminderSettings.scheduleCronTaskUid, lastEvaluatedAt: receivableReminderSettings.lastEvaluatedAt }).from(receivableReminderSettings).where(eq(receivableReminderSettings.userId, userId)).limit(1);
+  const setting = rows[0];
+  if (!setting) return { id: null, userId, enabled: false, daysBeforeDue: [1, 3, 7], timezone: REMINDER_TIMEZONE, scheduleCronTaskUid: null, lastEvaluatedAt: null };
+  return { ...setting, enabled: Boolean(setting.enabled), daysBeforeDue: parseReminderDays(setting.daysBeforeDue), timezone: REMINDER_TIMEZONE };
+}
+
+export async function saveReceivableReminderSettings(userId: number, input: ReminderSettingsInput) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const current = await getReceivableReminderSettings(userId);
+  const daysBeforeDue = serializeReminderDays(input.daysBeforeDue);
+  const scheduleCronTaskUid = input.scheduleCronTaskUid === undefined ? current.scheduleCronTaskUid : input.scheduleCronTaskUid;
+  await db.insert(receivableReminderSettings).values({ userId, enabled: input.enabled, daysBeforeDue, timezone: REMINDER_TIMEZONE, scheduleCronTaskUid }).onDuplicateKeyUpdate({
+    set: { enabled: input.enabled, daysBeforeDue, timezone: REMINDER_TIMEZONE, scheduleCronTaskUid },
+  });
+  return getReceivableReminderSettings(userId);
+}
+
+export async function getReceivableReminderSettingsByTaskUid(taskUid: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select({ userId: receivableReminderSettings.userId, enabled: receivableReminderSettings.enabled, scheduleCronTaskUid: receivableReminderSettings.scheduleCronTaskUid }).from(receivableReminderSettings).where(eq(receivableReminderSettings.scheduleCronTaskUid, taskUid)).limit(1);
+  return rows[0];
+}
+
+export async function evaluateReceivableReminders(userId: number, now = new Date()) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const settings = await getReceivableReminderSettings(userId);
+  if (!settings.enabled) return { created: 0, deduplicated: 0, considered: 0, skipped: "disabled" as const, evaluationDate: null };
+  const eligibleRows = await db.select({ id: receivables.id, invoiceId: receivables.invoiceId, documentNumber: receivables.documentNumber, customerName: receivables.customerName, dueDate: receivables.dueDate, totalAmount: receivables.totalAmount, paidAmount: receivables.paidAmount, status: receivables.status }).from(receivables).where(and(eq(receivables.userId, userId), ne(receivables.status, "cancelled"))).limit(500);
+  const candidates = eligibleRows.map((row) => getReminderCandidate(row, settings.daysBeforeDue, now, settings.timezone)).filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate));
+  let created = 0;
+  await db.transaction(async (tx) => {
+    for (const candidate of candidates) {
+      try {
+        await tx.insert(receivableReminders).values({ userId, receivableId: candidate.receivableId, invoiceId: candidate.invoiceId, reminderType: candidate.reminderType, dueDate: candidate.dueDate, dueDateBasis: candidate.dueDateBasis, evaluationDate: candidate.evaluationDate, outstandingAmount: candidate.outstandingAmount, documentNumber: candidate.documentNumber, customerName: candidate.customerName });
+        created += 1;
+      } catch (error) {
+        if (!isDuplicateKeyError(error)) throw error;
+      }
+    }
+    await tx.update(receivableReminderSettings).set({ lastEvaluatedAt: now }).where(eq(receivableReminderSettings.userId, userId));
+  });
+  return { created, deduplicated: candidates.length - created, considered: candidates.length, skipped: null, evaluationDate: candidates[0]?.evaluationDate ?? null };
+}
+
+export async function evaluateReceivableRemindersByTaskUid(taskUid: string, now = new Date()) {
+  const settings = await getReceivableReminderSettingsByTaskUid(taskUid);
+  if (!settings) return { created: 0, deduplicated: 0, considered: 0, skipped: "orphan" as const, evaluationDate: null };
+  if (!settings.enabled) return { created: 0, deduplicated: 0, considered: 0, skipped: "disabled" as const, evaluationDate: null };
+  return evaluateReceivableReminders(settings.userId, now);
+}
+
+export async function getReceivableReminderInbox(userId: number) {
+  const db = await getDb();
+  if (!db) return { items: [], counts: { unread: 0, dueSoon: 0, overdue: 0 } };
+  const items = await db.select({ id: receivableReminders.id, receivableId: receivableReminders.receivableId, invoiceId: receivableReminders.invoiceId, reminderType: receivableReminders.reminderType, dueDate: receivableReminders.dueDate, dueDateBasis: receivableReminders.dueDateBasis, outstandingAmount: receivableReminders.outstandingAmount, documentNumber: receivableReminders.documentNumber, customerName: receivableReminders.customerName, status: receivableReminders.status, readAt: receivableReminders.readAt, createdAt: receivableReminders.createdAt }).from(receivableReminders).where(eq(receivableReminders.userId, userId)).orderBy(desc(receivableReminders.createdAt)).limit(12);
+  const counts = await db.select({ unread: sql<number>`coalesce(sum(case when ${receivableReminders.status} = 'unread' then 1 else 0 end), 0)`, dueSoon: sql<number>`coalesce(sum(case when ${receivableReminders.status} = 'unread' and ${receivableReminders.reminderType} = 'due-soon' then 1 else 0 end), 0)`, overdue: sql<number>`coalesce(sum(case when ${receivableReminders.status} = 'unread' and ${receivableReminders.reminderType} = 'overdue' then 1 else 0 end), 0)` }).from(receivableReminders).where(eq(receivableReminders.userId, userId)).limit(1);
+  return { items, counts: { unread: Number(counts[0]?.unread || 0), dueSoon: Number(counts[0]?.dueSoon || 0), overdue: Number(counts[0]?.overdue || 0) } };
+}
+
+export async function markReceivableReminderRead(userId: number, reminderId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.update(receivableReminders).set({ status: "read", readAt: new Date() }).where(and(eq(receivableReminders.id, reminderId), eq(receivableReminders.userId, userId), eq(receivableReminders.status, "unread")));
+  return { updated: Number(result[0].affectedRows) > 0 };
 }
 
 export async function getReceivableDetails(userId: number, id: number) {
@@ -325,7 +412,7 @@ export async function recordPayment(userId: number, input: { receivableId: numbe
     const nextPaid = (nextPaidCents / 100).toFixed(2);
     const nextStatus = deriveReceivableStatus(receivable.totalAmount, nextPaid, receivable.dueDate);
     await tx.update(receivables).set({ paidAmount: nextPaid, status: nextStatus }).where(and(eq(receivables.id, input.receivableId), eq(receivables.userId, userId)));
-    return { paidAmount: nextPaid, status: nextStatus };
+    return { paymentId, paidAmount: nextPaid, status: nextStatus };
   });
 }
 

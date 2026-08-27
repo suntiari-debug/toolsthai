@@ -130,6 +130,26 @@ describe("receivables router access", () => {
     expect(createReceiptDraft).toHaveBeenCalledWith(321, 19);
   });
 
+  it("uses the authenticated owner for reminder inbox and read mutations", async () => {
+    const getReceivableReminderInbox = vi.spyOn(db, "getReceivableReminderInbox").mockResolvedValue({ items: [], counts: { unread: 0, dueSoon: 0, overdue: 0 } });
+    const markReceivableReminderRead = vi.spyOn(db, "markReceivableReminderRead").mockResolvedValue({ updated: true });
+    const ctx = { user: { id: 321, openId: "owner-321", name: "Owner", email: "owner@example.com", loginMethod: "test", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] } as TrpcContext;
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.receivables.reminderInbox()).resolves.toMatchObject({ counts: { unread: 0 } });
+    await expect(caller.receivables.markReminderRead({ reminderId: 71 })).resolves.toEqual({ updated: true });
+    expect(getReceivableReminderInbox).toHaveBeenCalledWith(321);
+    expect(markReceivableReminderRead).toHaveBeenCalledWith(321, 71);
+  });
+
+  it("keeps manual reminder evaluation restricted to admins and uses the admin owner ID", async () => {
+    const evaluateReceivableReminders = vi.spyOn(db, "evaluateReceivableReminders").mockResolvedValue({ created: 1, deduplicated: 0, considered: 1, skipped: null, evaluationDate: "2026-08-27" });
+    const userCtx = { user: { id: 321, openId: "owner-321", name: "Owner", email: "owner@example.com", loginMethod: "test", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] } as TrpcContext;
+    await expect(appRouter.createCaller(userCtx).receivables.evaluateRemindersNow()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    const adminCtx = { ...userCtx, user: { ...userCtx.user!, role: "admin" as const } } as TrpcContext;
+    await expect(appRouter.createCaller(adminCtx).receivables.evaluateRemindersNow()).resolves.toMatchObject({ created: 1 });
+    expect(evaluateReceivableReminders).toHaveBeenCalledWith(321);
+  });
+
   it("rejects receipt draft access when the receivable is not owned by the authenticated caller", async () => {
     const denied = new Error("ไม่พบรายการลูกหนี้ของผู้ใช้รายนี้");
     const getReceiptEligibility = vi.spyOn(db, "getReceiptEligibility").mockImplementation(async (userId) => { if (userId !== 321) throw denied; return { eligible: true } as never; });

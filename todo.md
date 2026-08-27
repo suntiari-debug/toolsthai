@@ -57,3 +57,11 @@
 - [x] เพิ่ม Vitest ที่ยืนยัน receipt eligibility/create draft ปฏิเสธ receivable ของผู้ใช้อื่นโดยตรง
 - [x] เพิ่ม DB-helper integration test ที่พิสูจน์ cross-owner receipt rejection โดยไม่ mock ผลการปฏิเสธ
 - [x] ตรวจ regression, commit/push และสร้าง checkpoint หลังฟีเจอร์ receipt draft ผ่าน QA
+- [x] อ่าน automation/scheduling และ Heartbeat guidance พร้อมตรวจ infrastructure notification ที่มีอยู่
+- [x] เพิ่ม schema แบบ additive สำหรับ reminder settings, reminder audit/dedupe และ in-app notifications
+- [x] เพิ่ม daily Heartbeat evaluation และ manual evaluation ที่ owner-scoped และใช้ dedupe ชุดเดียวกัน
+- [x] เพิ่ม tRPC settings/inbox/count/mark-read สำหรับ reminder notifications ด้วย owner scope
+- [x] เพิ่ม UI ตั้งค่า opt-in, notification inbox และ urgency counts ใน Dashboard/Document Center
+- [x] เพิ่ม tests timezone/date boundary/dedupe/paid-void/non-owner/schedule และ browser QA desktop/mobile
+- [x] เพิ่ม DB integration test paid→void และ taskUid scheduled evaluation เพื่อยืนยัน lifecycle จริง
+- [ ] จัดทำคู่มือ schedule/log/หยุดงานอัตโนมัติ, commit/push และสร้าง checkpoint หลังผ่าน QA

@@ -1,12 +1,13 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Link, useLocation } from "wouter";
 import { Archive, ArrowLeft, CircleDollarSign, Copy, FileClock, FileText, FolderArchive, History, Loader2, MoreHorizontal, Pencil, ReceiptText, Search, Send, Undo2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { startLogin } from "@/const";
 import { formatTHB } from "@/lib/document";
 import { openReceiptPreparation, ReceiptPreparationPortal } from "@/components/ReceiptPreparationSheet";
 import { trpc } from "@/lib/trpc";
 import { getReceivableEventLabel, type ReceivableEventType } from "@shared/receivableTimeline";
+import ReceivableReminderInbox from "@/components/ReceivableReminderInbox";
 
 type DocumentKind = "quotation" | "invoice" | "receipt" | "delivery-note" | "tax-invoice";
 type DocumentStatus = "draft" | "sent" | "paid" | "overdue";
@@ -28,12 +29,14 @@ export default function DocumentCenter() {
   const [archived, setArchived] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<number | null>(null);
+  const [reminderInvoiceId, setReminderInvoiceId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
   const utils = trpc.useUtils();
   const listInput = useMemo(() => ({ search: search.trim() || undefined, kind: kind === "all" ? undefined : kind, status: status === "all" ? undefined : status, archived }), [archived, kind, search, status]);
   const documentsQuery = trpc.documents.list.useQuery(listInput, { enabled: isAuthenticated });
   const exportsQuery = trpc.documents.listExports.useQuery({ documentId: selectedId ?? 1 }, { enabled: selectedId !== null && isAuthenticated });
   const receivableQuery = trpc.receivables.getByInvoice.useQuery({ invoiceId: selectedInvoiceId ?? 1 }, { enabled: selectedInvoiceId !== null && isAuthenticated });
+  const reminderDocumentQuery = trpc.documents.get.useQuery({ id: reminderInvoiceId ?? 1 }, { enabled: reminderInvoiceId !== null && isAuthenticated });
   const invalidate = () => void utils.documents.list.invalidate();
   const updateStatus = trpc.documents.updateStatus.useMutation({ onSuccess: () => { invalidate(); setFeedback("อัปเดตสถานะเอกสารแล้ว"); }, onError: () => setFeedback("ไม่สามารถอัปเดตสถานะเอกสารได้ กรุณาลองใหม่") });
   const setArchivedMutation = trpc.documents.setArchived.useMutation({ onSuccess: () => { invalidate(); setFeedback("อัปเดตการเก็บถาวรแล้ว"); }, onError: () => setFeedback("ไม่สามารถเปลี่ยนสถานะการเก็บถาวรได้ กรุณาลองใหม่") });
@@ -42,6 +45,18 @@ export default function DocumentCenter() {
     window.sessionStorage.setItem("toolsThai.convertedDocument", item.payload);
     setLocation(`/${item.kind}`);
   };
+  useEffect(() => {
+    const invoice = reminderDocumentQuery.data;
+    if (!invoice) return;
+    if (invoice.kind !== "invoice") {
+      setFeedback("ไม่พบใบแจ้งหนี้ต้นทางในคลังเอกสารของคุณ");
+      setReminderInvoiceId(null);
+      return;
+    }
+    openEditor(invoice);
+    setReminderInvoiceId(null);
+  }, [reminderDocumentQuery.data]);
+  const openReminderInvoice = (item: { invoiceId: number }) => setReminderInvoiceId(item.invoiceId);
 
   if (loading) return <div className="document-center-loading"><Loader2 size={22} className="animate-spin" /> กำลังตรวจสอบบัญชีผู้ใช้</div>;
   if (!isAuthenticated) return <main className="document-center-guest"><FileText size={34} /><h1>คลังเอกสารของคุณ</h1><p>เข้าสู่ระบบเพื่อค้นหา จัดสถานะ และจัดเก็บเอกสารธุรกิจอย่างเป็นระเบียบ</p><button type="button" className="button button-download" onClick={startLogin}>เข้าสู่ระบบเพื่อเปิดคลังเอกสาร</button></main>;
@@ -58,6 +73,7 @@ export default function DocumentCenter() {
       <div><Link href="/tools" className="back-link"><ArrowLeft size={16} /> เครื่องมือทั้งหมด</Link><p className="eyebrow">Document Center</p><h1>คลังเอกสารธุรกิจ</h1><p>ค้นหา ติดตามสถานะ และกลับไปทำงานกับเอกสารของคุณได้จากที่เดียว</p></div>
       <div className="document-center-summary"><FolderArchive size={22} /><span>เอกสารที่แสดง</span><strong>{documents.length}</strong></div>
     </header>
+    <ReceivableReminderInbox compact onOpenInvoice={openReminderInvoice} />
 
     <section className="document-center-controls" aria-label="ค้นหาและกรองเอกสาร">
       <label className="document-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ค้นหาเลขเอกสาร หรือชื่อลูกค้า" /></label>
