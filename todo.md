@@ -56,4 +56,4 @@
 - [x] เพิ่ม tests และ browser QA สำหรับ paid/partial/non-owner/idempotency/source-change บน desktop และ mobile
 - [x] เพิ่ม Vitest ที่ยืนยัน receipt eligibility/create draft ปฏิเสธ receivable ของผู้ใช้อื่นโดยตรง
 - [x] เพิ่ม DB-helper integration test ที่พิสูจน์ cross-owner receipt rejection โดยไม่ mock ผลการปฏิเสธ
-- [ ] ตรวจ regression, commit/push และสร้าง checkpoint หลังฟีเจอร์ receipt draft ผ่าน QA
+- [x] ตรวจ regression, commit/push และสร้าง checkpoint หลังฟีเจอร์ receipt draft ผ่าน QA
