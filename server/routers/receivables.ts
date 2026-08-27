@@ -13,6 +13,9 @@ export const receivablesRouter = router({
     if (!result) throw new Error("ไม่พบรายการลูกหนี้");
     return result;
   }),
+  getByInvoice: protectedProcedure.input(z.object({ invoiceId: z.number().int().positive() })).query(({ ctx, input }) => db.getReceivableByInvoice(ctx.user.id, input.invoiceId)),
   createFromInvoice: protectedProcedure.input(z.object({ invoiceId: z.number().int().positive() })).mutation(({ ctx, input }) => db.createReceivableFromInvoice(ctx.user.id, input.invoiceId)),
   recordPayment: protectedProcedure.input(z.object({ receivableId: z.number().int().positive(), amount: z.coerce.number().positive().max(999999999), paidAt: dateOnly, method: paymentMethod, reference: z.string().trim().max(128).optional(), note: z.string().trim().max(2000).optional() })).mutation(({ ctx, input }) => db.recordPayment(ctx.user.id, { receivableId: input.receivableId, amount: input.amount, paidAt: parseDateOnly(input.paidAt, true), method: input.method, reference: input.reference, note: input.note })),
+  voidPayment: protectedProcedure.input(z.object({ paymentId: z.number().int().positive(), reason: z.string().trim().min(3).max(255) })).mutation(({ ctx, input }) => db.voidPayment(ctx.user.id, input)),
+  replacePayment: protectedProcedure.input(z.object({ paymentId: z.number().int().positive(), receivableId: z.number().int().positive(), amount: z.coerce.number().positive().max(999999999), paidAt: dateOnly, method: paymentMethod, reference: z.string().trim().max(128).optional(), note: z.string().trim().max(2000).optional(), reason: z.string().trim().min(3).max(255) })).mutation(({ ctx, input }) => db.replacePayment(ctx.user.id, { ...input, paidAt: parseDateOnly(input.paidAt, true) })),
 });

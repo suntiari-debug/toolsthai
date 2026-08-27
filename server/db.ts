@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { companyProfiles, documentExports, InsertUser, payments, receivableEvents, receivables, savedDocuments, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
@@ -149,7 +149,7 @@ export async function listReceivables(userId: number) {
   const items = rows.map((row) => ({ ...row, status: deriveReceivableStatus(row.totalAmount, row.paidAmount, row.dueDate, now) }));
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const collected = await db.select({ total: sql<string>`coalesce(sum(${payments.amount}), 0)` }).from(payments).where(and(eq(payments.userId, userId), gte(payments.paidAt, startOfMonth), lt(payments.paidAt, nextMonth))).limit(1);
+  const collected = await db.select({ total: sql<string>`coalesce(sum(${payments.amount}), 0)` }).from(payments).where(and(eq(payments.userId, userId), isNull(payments.voidedAt), gte(payments.paidAt, startOfMonth), lt(payments.paidAt, nextMonth))).limit(1);
   const toCents = (value: number | string) => Math.round((Number(value) || 0) * 100);
   const fromCents = (value: number) => (value / 100).toFixed(2);
   const totalCents = items.reduce((sum, row) => sum + toCents(row.totalAmount), 0);
@@ -166,9 +166,16 @@ export async function getReceivableDetails(userId: number, id: number) {
   const result = await db.select({ id: receivables.id, invoiceId: receivables.invoiceId, documentNumber: receivables.documentNumber, customerName: receivables.customerName, customerAddress: receivables.customerAddress, issueDate: receivables.issueDate, dueDate: receivables.dueDate, totalAmount: receivables.totalAmount, paidAmount: receivables.paidAmount, status: receivables.status, note: receivables.note, updatedAt: receivables.updatedAt }).from(receivables).where(and(eq(receivables.id, id), eq(receivables.userId, userId))).limit(1);
   const receivable = result[0];
   if (!receivable) return undefined;
-  const paymentRows = await db.select({ id: payments.id, amount: payments.amount, paidAt: payments.paidAt, method: payments.method, reference: payments.reference, note: payments.note, createdAt: payments.createdAt }).from(payments).where(and(eq(payments.receivableId, id), eq(payments.userId, userId))).orderBy(desc(payments.paidAt)).limit(100);
-  const events = await db.select({ id: receivableEvents.id, type: receivableEvents.type, amount: receivableEvents.amount, note: receivableEvents.note, createdAt: receivableEvents.createdAt }).from(receivableEvents).where(and(eq(receivableEvents.receivableId, id), eq(receivableEvents.userId, userId))).orderBy(desc(receivableEvents.createdAt)).limit(100);
+  const paymentRows = await db.select({ id: payments.id, amount: payments.amount, paidAt: payments.paidAt, method: payments.method, reference: payments.reference, note: payments.note, voidedAt: payments.voidedAt, voidReason: payments.voidReason, createdAt: payments.createdAt }).from(payments).where(and(eq(payments.receivableId, id), eq(payments.userId, userId))).orderBy(desc(payments.paidAt)).limit(100);
+  const events = await db.select({ id: receivableEvents.id, type: receivableEvents.type, paymentId: receivableEvents.paymentId, amount: receivableEvents.amount, note: receivableEvents.note, createdAt: receivableEvents.createdAt }).from(receivableEvents).where(and(eq(receivableEvents.receivableId, id), eq(receivableEvents.userId, userId))).orderBy(desc(receivableEvents.createdAt)).limit(100);
   return { ...receivable, status: deriveReceivableStatus(receivable.totalAmount, receivable.paidAmount, receivable.dueDate), payments: paymentRows, events };
+}
+
+export async function getReceivableByInvoice(userId: number, invoiceId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select({ id: receivables.id }).from(receivables).where(and(eq(receivables.userId, userId), eq(receivables.invoiceId, invoiceId))).limit(1);
+  return result[0] ? getReceivableDetails(userId, result[0].id) : undefined;
 }
 
 export async function createReceivableFromInvoice(userId: number, invoiceId: number) {
@@ -201,12 +208,65 @@ export async function recordPayment(userId: number, input: { receivableId: numbe
     if (receivable.status === "cancelled") throw new Error("รายการลูกหนี้นี้ถูกยกเลิกแล้ว");
     const validation = validatePaymentAmount(receivable.totalAmount, receivable.paidAmount, input.amount);
     if (!validation.valid) throw new Error(validation.reason);
-    await tx.insert(payments).values({ userId, receivableId: input.receivableId, amount: Number(input.amount).toFixed(2), paidAt: input.paidAt, method: input.method, reference: input.reference || null, note: input.note || null });
-    await tx.insert(receivableEvents).values(buildReceivableActivityEvent({ userId, receivableId: input.receivableId, type: "payment-recorded", amount: input.amount, note: input.note }));
+    const paymentInsert = await tx.insert(payments).values({ userId, receivableId: input.receivableId, amount: Number(input.amount).toFixed(2), paidAt: input.paidAt, method: input.method, reference: input.reference || null, note: input.note || null });
+    const paymentId = Number(paymentInsert[0].insertId);
+    await tx.insert(receivableEvents).values(buildReceivableActivityEvent({ userId, receivableId: input.receivableId, type: "payment-recorded", paymentId, amount: input.amount, note: input.note }));
     const nextPaidCents = Math.round((Number(receivable.paidAmount) || 0) * 100) + validation.amountCents;
     const nextPaid = (nextPaidCents / 100).toFixed(2);
     const nextStatus = deriveReceivableStatus(receivable.totalAmount, nextPaid, receivable.dueDate);
     await tx.update(receivables).set({ paidAmount: nextPaid, status: nextStatus }).where(and(eq(receivables.id, input.receivableId), eq(receivables.userId, userId)));
     return { paidAmount: nextPaid, status: nextStatus };
+  });
+}
+
+type PaymentInput = { receivableId: number; amount: number; paidAt: Date; method: "cash" | "transfer" | "card" | "cheque" | "other"; reference?: string | null; note?: string | null };
+
+export async function voidPayment(userId: number, input: { paymentId: number; reason: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.transaction(async (tx) => {
+    const paymentRows = await tx.select({ id: payments.id, receivableId: payments.receivableId, amount: payments.amount, voidedAt: payments.voidedAt }).from(payments).where(and(eq(payments.id, input.paymentId), eq(payments.userId, userId))).limit(1);
+    const payment = paymentRows[0];
+    if (!payment) throw new Error("ไม่พบรายการรับชำระของผู้ใช้รายนี้");
+    if (payment.voidedAt) throw new Error("รายการรับชำระนี้ถูกยกเลิกไปแล้ว");
+    const receivableRows = await tx.select({ id: receivables.id, totalAmount: receivables.totalAmount, paidAmount: receivables.paidAmount, dueDate: receivables.dueDate, status: receivables.status }).from(receivables).where(and(eq(receivables.id, payment.receivableId), eq(receivables.userId, userId))).limit(1);
+    const receivable = receivableRows[0];
+    if (!receivable) throw new Error("ไม่พบรายการลูกหนี้ของผู้ใช้รายนี้");
+    const reason = input.reason.trim();
+    await tx.update(payments).set({ voidedAt: new Date(), voidReason: reason }).where(and(eq(payments.id, payment.id), eq(payments.userId, userId), isNull(payments.voidedAt)));
+    await tx.insert(receivableEvents).values(buildReceivableActivityEvent({ userId, receivableId: receivable.id, type: "payment-voided", paymentId: payment.id, amount: payment.amount, note: reason }));
+    const nextPaidCents = Math.max(0, Math.round((Number(receivable.paidAmount) || 0) * 100) - Math.round((Number(payment.amount) || 0) * 100));
+    const nextPaid = (nextPaidCents / 100).toFixed(2);
+    const nextStatus = deriveReceivableStatus(receivable.totalAmount, nextPaid, receivable.dueDate);
+    await tx.update(receivables).set({ paidAmount: nextPaid, status: nextStatus }).where(and(eq(receivables.id, receivable.id), eq(receivables.userId, userId)));
+    return { receivableId: receivable.id, paidAmount: nextPaid, status: nextStatus };
+  });
+}
+
+export async function replacePayment(userId: number, input: PaymentInput & { paymentId: number; reason: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.transaction(async (tx) => {
+    const paymentRows = await tx.select({ id: payments.id, receivableId: payments.receivableId, amount: payments.amount, voidedAt: payments.voidedAt }).from(payments).where(and(eq(payments.id, input.paymentId), eq(payments.userId, userId), eq(payments.receivableId, input.receivableId))).limit(1);
+    const payment = paymentRows[0];
+    if (!payment) throw new Error("ไม่พบรายการรับชำระของผู้ใช้รายนี้");
+    if (payment.voidedAt) throw new Error("รายการรับชำระนี้ถูกยกเลิกไปแล้ว");
+    const receivableRows = await tx.select({ id: receivables.id, totalAmount: receivables.totalAmount, paidAmount: receivables.paidAmount, dueDate: receivables.dueDate, status: receivables.status }).from(receivables).where(and(eq(receivables.id, input.receivableId), eq(receivables.userId, userId))).limit(1);
+    const receivable = receivableRows[0];
+    if (!receivable) throw new Error("ไม่พบรายการลูกหนี้ของผู้ใช้รายนี้");
+    const paidWithoutCurrentCents = Math.max(0, Math.round((Number(receivable.paidAmount) || 0) * 100) - Math.round((Number(payment.amount) || 0) * 100));
+    const validation = validatePaymentAmount(receivable.totalAmount, (paidWithoutCurrentCents / 100).toFixed(2), input.amount);
+    if (!validation.valid) throw new Error(validation.reason);
+    const reason = input.reason.trim();
+    const replacementInsert = await tx.insert(payments).values({ userId, receivableId: input.receivableId, amount: Number(input.amount).toFixed(2), paidAt: input.paidAt, method: input.method, reference: input.reference || null, note: input.note || null });
+    const replacementId = Number(replacementInsert[0].insertId);
+    await tx.update(payments).set({ voidedAt: new Date(), voidReason: `แทนที่ด้วยรายการ #${replacementId}: ${reason}` }).where(and(eq(payments.id, payment.id), eq(payments.userId, userId), isNull(payments.voidedAt)));
+    await tx.insert(receivableEvents).values(buildReceivableActivityEvent({ userId, receivableId: receivable.id, type: "payment-replaced", paymentId: payment.id, amount: payment.amount, note: `แทนที่ด้วยรายการ #${replacementId}: ${reason}` }));
+    await tx.insert(receivableEvents).values(buildReceivableActivityEvent({ userId, receivableId: receivable.id, type: "payment-recorded", paymentId: replacementId, amount: input.amount, note: `รายการแทน #${payment.id}${input.note?.trim() ? ` · ${input.note.trim()}` : ""}` }));
+    const nextPaidCents = paidWithoutCurrentCents + validation.amountCents;
+    const nextPaid = (nextPaidCents / 100).toFixed(2);
+    const nextStatus = deriveReceivableStatus(receivable.totalAmount, nextPaid, receivable.dueDate);
+    await tx.update(receivables).set({ paidAmount: nextPaid, status: nextStatus }).where(and(eq(receivables.id, receivable.id), eq(receivables.userId, userId)));
+    return { receivableId: receivable.id, paidAmount: nextPaid, status: nextStatus, replacementId };
   });
 }

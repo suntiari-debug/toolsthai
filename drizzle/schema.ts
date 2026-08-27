@@ -87,6 +87,8 @@ export const payments = mysqlTable("payments", {
   method: mysqlEnum("method", ["cash", "transfer", "card", "cheque", "other"]).notNull().default("transfer"),
   reference: varchar("reference", { length: 128 }),
   note: text("note"),
+  voidedAt: timestamp("voidedAt"),
+  voidReason: varchar("voidReason", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => ({
   userPaidAtIdx: index("payments_user_paid_at_idx").on(table.userId, table.paidAt),
@@ -97,7 +99,8 @@ export const receivableEvents = mysqlTable("receivable_events", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   receivableId: int("receivableId").notNull().references(() => receivables.id, { onDelete: "cascade" }),
-  type: mysqlEnum("type", ["created", "payment-recorded"]).notNull(),
+  type: mysqlEnum("type", ["created", "payment-recorded", "payment-voided", "payment-replaced"]).notNull(),
+  paymentId: int("paymentId").references(() => payments.id, { onDelete: "set null" }),
   amount: decimal("amount", { precision: 14, scale: 2 }),
   note: text("note"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

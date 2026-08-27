@@ -71,11 +71,12 @@ export function validatePaymentAmount(totalAmount: number | string, paidAmount: 
   return { valid: true as const, amountCents, outstandingCents };
 }
 
-export function buildReceivableActivityEvent(input: { userId: number; receivableId: number; type: "created" | "payment-recorded"; amount?: number | string | null; note?: string | null }) {
+export function buildReceivableActivityEvent(input: { userId: number; receivableId: number; type: "created" | "payment-recorded" | "payment-voided" | "payment-replaced"; paymentId?: number | null; amount?: number | string | null; note?: string | null }) {
   return {
     userId: input.userId,
     receivableId: input.receivableId,
     type: input.type,
+    paymentId: input.paymentId ?? null,
     amount: input.amount === null || input.amount === undefined ? null : centsToMoney(moneyToCents(input.amount)),
     note: input.note?.trim() || null,
   };

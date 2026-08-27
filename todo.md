@@ -4,12 +4,12 @@
 - [x] ตรวจความแตกต่างจาก checkpoint ที่เผยแพร่ล่าสุด และระบุว่าส่วน Module 1/PDF workflow ที่เคยเผยแพร่ไม่ได้อยู่ใน commit e92319c
 - [x] ออกแบบ model ยอดคงค้าง รายการรับชำระบางส่วน และสถานะเอกสารสำหรับ Module 2
 - [x] เพิ่ม schema, migration และ tRPC API owner-scoped สำหรับการรับชำระและ activity timeline
-- [ ] เพิ่มการบันทึก/แก้ไข/ลบรายการรับชำระบางส่วน พร้อมคำนวณยอดคงเหลือและสถานะอัตโนมัติ
+- [x] เพิ่มการบันทึก/แก้ไข/ยกเลิกรายการรับชำระบางส่วนแบบ audit-safe พร้อมคำนวณยอดคงเหลือและสถานะอัตโนมัติ
 - [x] เพิ่มแปลงใบเสนอราคาเป็นใบแจ้งหนี้โดยรักษาข้อมูลลูกค้าและรายการสินค้า
 - [x] เพิ่ม dashboard ยอดรอรับ ยอดเกินกำหนด ยอดรับชำระ และตัวกรองช่วงเวลา
-- [ ] เชื่อมประวัติการรับชำระกับ Document Center พร้อมรายละเอียด timeline
+- [x] เชื่อมประวัติการรับชำระกับ Document Center พร้อมรายละเอียด timeline
 - [x] เพิ่ม Vitest, ตรวจ TypeScript, production build, browser flows และ responsive preview
-- [ ] บันทึก checkpoint และสรุป Module 2
+- [x] บันทึก checkpoint และสรุป Module 2 baseline ก่อนต่อยอด payment audit
 - [x] ตรวจ migration 0005_amusing_lily_hollister.sql, schema และสถานะฐานข้อมูลก่อน apply
 - [x] ตรวจ owner-scoped API สำหรับ receivables และ partial payments ก่อนเผยแพร่
 - [x] รัน TypeScript, tests, production build และ browser QA สำหรับ dashboard/partial payment
@@ -20,9 +20,9 @@
 - [x] เพิ่มตัวกรองช่วงเวลาใน Receivables Dashboard พร้อม browser QA
 - [x] เพิ่ม unit tests สำหรับการสร้างและอ่าน activity timeline แบบ owner-scoped
 - [x] เพิ่ม integration-style test การอ่าน activity timeline ผ่าน receivables.get โดยยืนยัน userId และลำดับเหตุการณ์
-- [ ] ระบุ source หรือ export ที่กู้ Module 1/PDF workflow เวอร์ชัน checkpoint 014c73f1 ได้
+- [x] ยืนยันว่าไม่พบ source/export ที่กู้ Module 1/PDF workflow เวอร์ชัน checkpoint 014c73f1 ได้ และบันทึกเหตุผลประกอบการเลือก rebuild
 - [x] ตรวจ Git history: commit e92319c สืบทอด PDF/document base จาก bb1d3bc แต่ไม่พบ Document Center และ PDF workflow รุ่น checkpoint 014c73f1 ใน Git history
-- [ ] กู้และเปรียบเทียบ Module 1/PDF กับฐาน Module 2 ก่อนรวมโค้ด
+- [x] เลือก rebuild Module 1/PDF บนฐาน Module 2 แทนการกู้ source ที่ไม่พบ และตรวจ feature parity ที่กำหนดไว้
 - [x] รวมและตรวจ regression ของ Module 1/PDF กับ Module 2 ก่อน checkpoint เผยแพร่
 - [x] จัดทำเอกสารส่งต่อสถานะ Tools Thai สำหรับทีมงาน พร้อมสรุป recovery risk และหลักฐาน QA ล่าสุด
 - [x] วิเคราะห์ contract ของ saved documents, editor และ Module 2 ก่อนสร้าง Module 1 ใหม่
@@ -34,3 +34,7 @@
 - [x] Reconcile Drizzle migration metadata ของ 0005–0007 หลังตรวจ hash/timestamp และสร้าง indexes ของ Document Center ที่ขาด
 - [x] เพิ่ม error feedback และ retry state สำหรับ list, status, archive, duplicate และ PDF export history ใน Document Center
 - [x] เพิ่มทางเข้าคลังเอกสารสำหรับผู้ใช้ที่เข้าสู่ระบบในเมนูหลัก และแสดงจำนวน/เวลาส่งออก PDF ล่าสุดในแต่ละรายการ
+- [x] เพิ่ม payment void/replacement ที่เก็บ audit trail, คำนวณยอดคงเหลือใหม่ และไม่ลบรายการรับชำระเดิม
+- [x] แสดงสถานะรับชำระและ timeline ของใบแจ้งหนี้แบบ owner-scoped ใน Document Center
+- [x] ตรวจ schema/API/tests/browser QA สำหรับ audit-safe payment management และ Document Center receivable linkage
+- [ ] บันทึก checkpoint สุดท้ายหลังปิดรายการ Module 1+2 ที่ค้าง

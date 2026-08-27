@@ -38,8 +38,13 @@ describe("receivables business rules", () => {
   });
 
   it("preserves the authenticated owner and normalized money in activity events", () => {
-    expect(buildReceivableActivityEvent({ userId: 321, receivableId: 19, type: "payment-recorded", amount: "400", note: "  โอนแล้ว  " })).toEqual({ userId: 321, receivableId: 19, type: "payment-recorded", amount: "400.00", note: "โอนแล้ว" });
-    expect(buildReceivableActivityEvent({ userId: 321, receivableId: 19, type: "created" })).toMatchObject({ userId: 321, receivableId: 19, type: "created", amount: null, note: null });
+    expect(buildReceivableActivityEvent({ userId: 321, receivableId: 19, type: "payment-recorded", amount: "400", note: "  โอนแล้ว  " })).toEqual({ userId: 321, receivableId: 19, type: "payment-recorded", paymentId: null, amount: "400.00", note: "โอนแล้ว" });
+    expect(buildReceivableActivityEvent({ userId: 321, receivableId: 19, type: "created" })).toMatchObject({ userId: 321, receivableId: 19, type: "created", paymentId: null, amount: null, note: null });
+  });
+
+  it("records payment linkage for audit-safe void and replacement activity events", () => {
+    expect(buildReceivableActivityEvent({ userId: 321, receivableId: 19, type: "payment-voided", paymentId: 71, amount: "400", note: "เลขอ้างอิงผิด" })).toMatchObject({ userId: 321, receivableId: 19, type: "payment-voided", paymentId: 71, amount: "400.00" });
+    expect(buildReceivableActivityEvent({ userId: 321, receivableId: 19, type: "payment-replaced", paymentId: 71, amount: "400" })).toMatchObject({ type: "payment-replaced", paymentId: 71, amount: "400.00" });
   });
 });
 
@@ -67,6 +72,16 @@ describe("receivables router access", () => {
     expect(recordPayment).toHaveBeenCalledWith(321, expect.objectContaining({ receivableId: 19, amount: 400, method: "transfer", note: "โอนแล้ว" }));
   });
 
+  it("passes audit-safe void and replacement requests through the authenticated owner", async () => {
+    const voidPayment = vi.spyOn(db, "voidPayment").mockResolvedValue({ receivableId: 19, paidAmount: "0.00", status: "open" } as never);
+    const replacePayment = vi.spyOn(db, "replacePayment").mockResolvedValue({ receivableId: 19, paidAmount: "350.00", status: "partial", replacementId: 72 } as never);
+    const caller = appRouter.createCaller({ user: { id: 321, openId: "owner-321", name: "Owner", email: "owner@example.com", loginMethod: "test", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] } as TrpcContext);
+    await caller.receivables.voidPayment({ paymentId: 71, reason: "เลขอ้างอิงผิด" });
+    await caller.receivables.replacePayment({ paymentId: 71, receivableId: 19, amount: 350, paidAt: "2026-08-27", method: "transfer", reason: "แก้ไขยอดตามสลิป", reference: "TRX-072" });
+    expect(voidPayment).toHaveBeenCalledWith(321, { paymentId: 71, reason: "เลขอ้างอิงผิด" });
+    expect(replacePayment).toHaveBeenCalledWith(321, expect.objectContaining({ paymentId: 71, receivableId: 19, amount: 350, method: "transfer", reference: "TRX-072" }));
+  });
+
   it("returns newest activity events through an owner-scoped receivable detail query", async () => {
     const events = [
       { id: 82, type: "payment-recorded", amount: "400.00", note: null, createdAt: new Date("2026-08-27T10:00:00.000Z") },
@@ -76,5 +91,12 @@ describe("receivables router access", () => {
     const ctx = { user: { id: 321, openId: "owner-321", name: "Owner", email: "owner@example.com", loginMethod: "test", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] } as TrpcContext;
     await expect(appRouter.createCaller(ctx).receivables.get({ id: 19 })).resolves.toMatchObject({ id: 19, events });
     expect(getReceivableDetails).toHaveBeenCalledWith(321, 19);
+  });
+
+  it("looks up a document-center receivable by invoice through the authenticated owner", async () => {
+    const getReceivableByInvoice = vi.spyOn(db, "getReceivableByInvoice").mockResolvedValue({ id: 19, invoiceId: 8, userId: 321, events: [] } as never);
+    const ctx = { user: { id: 321, openId: "owner-321", name: "Owner", email: "owner@example.com", loginMethod: "test", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] } as TrpcContext;
+    await expect(appRouter.createCaller(ctx).receivables.getByInvoice({ invoiceId: 8 })).resolves.toMatchObject({ id: 19, invoiceId: 8 });
+    expect(getReceivableByInvoice).toHaveBeenCalledWith(321, 8);
   });
 });

@@ -1,6 +1,8 @@
 export const receivableEventLabels = {
   created: "เพิ่มรายการลูกหนี้",
   "payment-recorded": "บันทึกการรับชำระ",
+  "payment-voided": "ยกเลิกรายการรับชำระ",
+  "payment-replaced": "แทนที่รายการรับชำระ",
 } as const;
 
 export type ReceivableEventType = keyof typeof receivableEventLabels;

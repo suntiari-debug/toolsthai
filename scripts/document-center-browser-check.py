@@ -43,6 +43,8 @@ def response_for(procedure):
     if procedure == "documents.recordExportForDocument":
         state["exports"].append({"id": 30, "filename": "ใบแจ้งหนี้-ACME.pdf", "createdAt": NOW})
         return {"documentId": 8}
+    if procedure == "receivables.getByInvoice":
+        return {"id": 101, "invoiceId": 8, "documentNumber": "IV-FIXTURE-001", "totalAmount": "1000.00", "paidAmount": "400.00", "status": "partial", "events": [{"id": 602, "type": "payment-recorded", "paymentId": 501, "amount": "400.00", "note": "โอนแล้ว", "createdAt": NOW}, {"id": 601, "type": "created", "paymentId": None, "amount": "1000.00", "note": "เพิ่มจากใบแจ้งหนี้", "createdAt": NOW}]}
     if procedure == "companyProfile.get":
         return None
     return None
@@ -76,6 +78,12 @@ with sync_playwright() as playwright:
     page.goto(f"{BASE_URL}/documents", wait_until="networkidle")
     state["archived"] = False
     page.reload(wait_until="networkidle")
+    page.get_by_role("button", name="รับชำระ", exact=True).first.click()
+    receivable_dialog = page.get_by_role("dialog")
+    receivable_dialog.get_by_text("ยอดคงเหลือ").wait_for(state="visible", timeout=5000)
+    receivable_dialog.get_by_text("ชำระบางส่วน").wait_for(state="visible", timeout=5000)
+    receivable_dialog.get_by_text("บันทึกการรับชำระ").wait_for(state="visible", timeout=5000)
+    receivable_dialog.get_by_role("button", name="ปิดสถานะรับชำระ").click()
     page.get_by_role("button", name="แก้ไข").first.click()
     pdf_trigger = page.get_by_role("button", name="ดาวน์โหลด PDF").first
     pdf_trigger.wait_for(state="visible", timeout=8000)
@@ -98,5 +106,5 @@ with sync_playwright() as playwright:
     page.get_by_text("ส่งออก PDF 1 ครั้ง", exact=False).wait_for(state="visible", timeout=8000)
     page.get_by_role("button", name="PDF", exact=True).first.click()
     page.get_by_text("ใบแจ้งหนี้-ACME.pdf").wait_for(state="visible", timeout=5000)
-    print(json.dumps({"documentCenter": "filter-status-duplicate-archive-resume", "pdfConfirmation": "filename-and-live-preview", "pdfDownload": download.suggested_filename, "exportHistory": len(state["exports"])}, ensure_ascii=False))
+    print(json.dumps({"documentCenter": "filter-status-duplicate-archive-resume", "receivableLinkage": "invoice-balance-and-timeline", "pdfConfirmation": "filename-and-live-preview", "pdfDownload": download.suggested_filename, "exportHistory": len(state["exports"])}, ensure_ascii=False))
     browser.close()
