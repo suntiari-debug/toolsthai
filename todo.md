@@ -64,4 +64,4 @@
 - [x] เพิ่ม UI ตั้งค่า opt-in, notification inbox และ urgency counts ใน Dashboard/Document Center
 - [x] เพิ่ม tests timezone/date boundary/dedupe/paid-void/non-owner/schedule และ browser QA desktop/mobile
 - [x] เพิ่ม DB integration test paid→void และ taskUid scheduled evaluation เพื่อยืนยัน lifecycle จริง
-- [ ] จัดทำคู่มือ schedule/log/หยุดงานอัตโนมัติ, commit/push และสร้าง checkpoint หลังผ่าน QA
+- [x] จัดทำคู่มือ schedule/log/หยุดงานอัตโนมัติ, commit/push และสร้าง checkpoint หลังผ่าน QA
