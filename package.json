@@ -12,6 +12,7 @@
     "test": "vitest run",
     "verify:ssr": "bash scripts/verify-ssr.sh",
     "check:company-profile": "node scripts/company-profile-browser-check.mjs",
+    "test:receivables-browser": "python3 scripts/receivables-browser-check.py",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {

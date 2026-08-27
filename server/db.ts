@@ -1,8 +1,8 @@
 import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { companyProfiles, InsertUser, payments, receivables, savedDocuments, users } from "../drizzle/schema";
+import { companyProfiles, documentExports, InsertUser, payments, receivableEvents, receivables, savedDocuments, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
-import { calculateInvoiceTotal, deriveReceivableStatus, parseDateOnly, parseInvoicePayload, validatePaymentAmount } from "./receivables";
+import { buildReceivableActivityEvent, calculateInvoiceTotal, deriveReceivableStatus, parseDateOnly, parseInvoicePayload, validatePaymentAmount } from "./receivables";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -69,17 +69,76 @@ export async function saveDocument(input: { userId: number; kind: "quotation" | 
   await db.insert(savedDocuments).values(input);
 }
 
-export async function listSavedDocuments(userId: number) {
+export type SavedDocumentStatus = "draft" | "sent" | "paid" | "overdue";
+
+export async function listSavedDocuments(userId: number, filters: { kind?: "quotation" | "invoice" | "receipt" | "delivery-note" | "tax-invoice"; status?: SavedDocumentStatus; archived?: boolean; search?: string } = {}) {
   const db = await getDb();
   if (!db) return [];
-  return db.select({ id: savedDocuments.id, kind: savedDocuments.kind, documentNumber: savedDocuments.documentNumber, customerName: savedDocuments.customerName, payload: savedDocuments.payload, updatedAt: savedDocuments.updatedAt, createdAt: savedDocuments.createdAt }).from(savedDocuments).where(eq(savedDocuments.userId, userId)).orderBy(desc(savedDocuments.updatedAt)).limit(50);
+  const conditions = [eq(savedDocuments.userId, userId)];
+  if (filters.kind) conditions.push(eq(savedDocuments.kind, filters.kind));
+  if (filters.status) conditions.push(eq(savedDocuments.status, filters.status));
+  if (filters.archived === true) conditions.push(sql`${savedDocuments.archivedAt} is not null`);
+  if (filters.archived === false) conditions.push(sql`${savedDocuments.archivedAt} is null`);
+  if (filters.search?.trim()) {
+    const term = `%${filters.search.trim().replace(/[\\%_]/g, "\\$&")}%`;
+    conditions.push(sql`(${savedDocuments.documentNumber} like ${term} escape '\\' or ${savedDocuments.customerName} like ${term} escape '\\')`);
+  }
+  return db.select({ id: savedDocuments.id, kind: savedDocuments.kind, documentNumber: savedDocuments.documentNumber, customerName: savedDocuments.customerName, payload: savedDocuments.payload, status: savedDocuments.status, archivedAt: savedDocuments.archivedAt, updatedAt: savedDocuments.updatedAt, createdAt: savedDocuments.createdAt, exportCount: sql<number>`(select count(*) from ${documentExports} where ${documentExports.userId} = ${userId} and ${documentExports.documentId} = ${savedDocuments.id})`, lastExportAt: sql<Date | null>`(select max(${documentExports.createdAt}) from ${documentExports} where ${documentExports.userId} = ${userId} and ${documentExports.documentId} = ${savedDocuments.id})` }).from(savedDocuments).where(and(...conditions)).orderBy(desc(savedDocuments.updatedAt)).limit(100);
 }
 
 export async function getSavedDocument(userId: number, id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select({ id: savedDocuments.id, userId: savedDocuments.userId, kind: savedDocuments.kind, documentNumber: savedDocuments.documentNumber, customerName: savedDocuments.customerName, payload: savedDocuments.payload, updatedAt: savedDocuments.updatedAt, createdAt: savedDocuments.createdAt }).from(savedDocuments).where(and(eq(savedDocuments.id, id), eq(savedDocuments.userId, userId))).limit(1);
+  const result = await db.select({ id: savedDocuments.id, userId: savedDocuments.userId, kind: savedDocuments.kind, documentNumber: savedDocuments.documentNumber, customerName: savedDocuments.customerName, payload: savedDocuments.payload, status: savedDocuments.status, archivedAt: savedDocuments.archivedAt, updatedAt: savedDocuments.updatedAt, createdAt: savedDocuments.createdAt }).from(savedDocuments).where(and(eq(savedDocuments.id, id), eq(savedDocuments.userId, userId))).limit(1);
   return result[0];
+}
+
+export async function updateSavedDocumentStatus(userId: number, id: number, status: SavedDocumentStatus) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(savedDocuments).set({ status }).where(and(eq(savedDocuments.id, id), eq(savedDocuments.userId, userId)));
+  return getSavedDocument(userId, id);
+}
+
+export async function setSavedDocumentArchived(userId: number, id: number, archived: boolean) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(savedDocuments).set({ archivedAt: archived ? new Date() : null }).where(and(eq(savedDocuments.id, id), eq(savedDocuments.userId, userId)));
+  return getSavedDocument(userId, id);
+}
+
+export async function duplicateSavedDocument(userId: number, id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const source = await getSavedDocument(userId, id);
+  if (!source) throw new Error("ไม่พบเอกสารของผู้ใช้รายนี้");
+  const suffix = `-COPY-${Date.now().toString().slice(-6)}`;
+  const documentNumber = `${source.documentNumber.slice(0, Math.max(1, 64 - suffix.length))}${suffix}`;
+  const result = await db.insert(savedDocuments).values({ userId, kind: source.kind, documentNumber, customerName: source.customerName, payload: source.payload, status: "draft" });
+  return getSavedDocument(userId, Number(result[0].insertId));
+}
+
+export async function recordDocumentExport(userId: number, documentId: number, filename: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const document = await getSavedDocument(userId, documentId);
+  if (!document) throw new Error("ไม่พบเอกสารของผู้ใช้รายนี้");
+  await db.insert(documentExports).values({ userId, documentId, filename });
+}
+
+export async function recordDocumentExportForDocument(input: { userId: number; kind: "quotation" | "invoice" | "receipt" | "delivery-note" | "tax-invoice"; documentNumber: string; customerName?: string; payload: string; filename: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const existing = await db.select({ id: savedDocuments.id }).from(savedDocuments).where(and(eq(savedDocuments.userId, input.userId), eq(savedDocuments.kind, input.kind), eq(savedDocuments.documentNumber, input.documentNumber), eq(savedDocuments.payload, input.payload))).orderBy(desc(savedDocuments.updatedAt)).limit(1);
+  const documentId = existing[0]?.id ?? Number((await db.insert(savedDocuments).values({ userId: input.userId, kind: input.kind, documentNumber: input.documentNumber, customerName: input.customerName, payload: input.payload, status: "draft" }))[0].insertId);
+  await db.insert(documentExports).values({ userId: input.userId, documentId, filename: input.filename });
+  return { documentId };
+}
+
+export async function listDocumentExports(userId: number, documentId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: documentExports.id, filename: documentExports.filename, createdAt: documentExports.createdAt }).from(documentExports).where(and(eq(documentExports.userId, userId), eq(documentExports.documentId, documentId))).orderBy(desc(documentExports.createdAt)).limit(50);
 }
 
 export async function listReceivables(userId: number) {
@@ -108,7 +167,8 @@ export async function getReceivableDetails(userId: number, id: number) {
   const receivable = result[0];
   if (!receivable) return undefined;
   const paymentRows = await db.select({ id: payments.id, amount: payments.amount, paidAt: payments.paidAt, method: payments.method, reference: payments.reference, note: payments.note, createdAt: payments.createdAt }).from(payments).where(and(eq(payments.receivableId, id), eq(payments.userId, userId))).orderBy(desc(payments.paidAt)).limit(100);
-  return { ...receivable, status: deriveReceivableStatus(receivable.totalAmount, receivable.paidAmount, receivable.dueDate), payments: paymentRows };
+  const events = await db.select({ id: receivableEvents.id, type: receivableEvents.type, amount: receivableEvents.amount, note: receivableEvents.note, createdAt: receivableEvents.createdAt }).from(receivableEvents).where(and(eq(receivableEvents.receivableId, id), eq(receivableEvents.userId, userId))).orderBy(desc(receivableEvents.createdAt)).limit(100);
+  return { ...receivable, status: deriveReceivableStatus(receivable.totalAmount, receivable.paidAmount, receivable.dueDate), payments: paymentRows, events };
 }
 
 export async function createReceivableFromInvoice(userId: number, invoiceId: number) {
@@ -127,6 +187,7 @@ export async function createReceivableFromInvoice(userId: number, invoiceId: num
   const status = deriveReceivableStatus(totals.total, "0.00", dueDate);
   const result = await db.insert(receivables).values({ userId, invoiceId, documentNumber: invoice.documentNumber, customerName, customerAddress: payload.customer?.address || null, issueDate, dueDate, totalAmount: totals.total, paidAmount: "0.00", status, note: payload.note || null });
   const insertedId = Number(result[0].insertId);
+  await db.insert(receivableEvents).values(buildReceivableActivityEvent({ userId, receivableId: insertedId, type: "created", amount: totals.total, note: "เพิ่มจากใบแจ้งหนี้" }));
   return getReceivableDetails(userId, insertedId);
 }
 
@@ -141,6 +202,7 @@ export async function recordPayment(userId: number, input: { receivableId: numbe
     const validation = validatePaymentAmount(receivable.totalAmount, receivable.paidAmount, input.amount);
     if (!validation.valid) throw new Error(validation.reason);
     await tx.insert(payments).values({ userId, receivableId: input.receivableId, amount: Number(input.amount).toFixed(2), paidAt: input.paidAt, method: input.method, reference: input.reference || null, note: input.note || null });
+    await tx.insert(receivableEvents).values(buildReceivableActivityEvent({ userId, receivableId: input.receivableId, type: "payment-recorded", amount: input.amount, note: input.note }));
     const nextPaidCents = Math.round((Number(receivable.paidAmount) || 0) * 100) + validation.amountCents;
     const nextPaid = (nextPaidCents / 100).toFixed(2);
     const nextStatus = deriveReceivableStatus(receivable.totalAmount, nextPaid, receivable.dueDate);

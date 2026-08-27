@@ -8,6 +8,7 @@ import { storagePut } from "./storage";
 import { receivablesRouter } from "./routers/receivables";
 
 const documentKind = z.enum(["quotation", "invoice", "receipt", "delivery-note", "tax-invoice"]);
+const documentStatus = z.enum(["draft", "sent", "paid", "overdue"]);
 const companyProfileInput = z.object({
   name: z.string().trim().min(1).max(255),
   address: z.string().trim().max(2000).optional(),
@@ -74,11 +75,21 @@ export const appRouter = router({
   }),
   receivables: receivablesRouter,
   documents: router({
-    list: protectedProcedure.query(({ ctx }) => db.listSavedDocuments(ctx.user.id)),
+    list: protectedProcedure.input(z.object({ kind: documentKind.optional(), status: documentStatus.optional(), archived: z.boolean().optional(), search: z.string().trim().max(120).optional() }).optional()).query(({ ctx, input }) => db.listSavedDocuments(ctx.user.id, input)),
+    get: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => (await db.getSavedDocument(ctx.user.id, input.id)) ?? null),
     save: protectedProcedure.input(z.object({ kind: documentKind, documentNumber: z.string().trim().min(1).max(64), customerName: z.string().trim().max(255).optional(), payload: z.string().min(2).max(60_000) })).mutation(async ({ ctx, input }) => {
       await db.saveDocument({ userId: ctx.user.id, ...input });
       return { success: true } as const;
     }),
+    updateStatus: protectedProcedure.input(z.object({ id: z.number().int().positive(), status: documentStatus })).mutation(async ({ ctx, input }) => (await db.updateSavedDocumentStatus(ctx.user.id, input.id, input.status)) ?? null),
+    setArchived: protectedProcedure.input(z.object({ id: z.number().int().positive(), archived: z.boolean() })).mutation(async ({ ctx, input }) => (await db.setSavedDocumentArchived(ctx.user.id, input.id, input.archived)) ?? null),
+    duplicate: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => (await db.duplicateSavedDocument(ctx.user.id, input.id)) ?? null),
+    listExports: protectedProcedure.input(z.object({ documentId: z.number().int().positive() })).query(({ ctx, input }) => db.listDocumentExports(ctx.user.id, input.documentId)),
+    recordExport: protectedProcedure.input(z.object({ documentId: z.number().int().positive(), filename: z.string().trim().min(5).max(255) })).mutation(async ({ ctx, input }) => {
+      await db.recordDocumentExport(ctx.user.id, input.documentId, input.filename);
+      return { success: true } as const;
+    }),
+    recordExportForDocument: protectedProcedure.input(z.object({ kind: documentKind, documentNumber: z.string().trim().min(1).max(64), customerName: z.string().trim().max(255).optional(), payload: z.string().min(2).max(60_000), filename: z.string().trim().min(5).max(255) })).mutation(({ ctx, input }) => db.recordDocumentExportForDocument({ userId: ctx.user.id, ...input })),
   }),
 });
 

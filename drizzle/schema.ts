@@ -40,9 +40,23 @@ export const savedDocuments = mysqlTable("saved_documents", {
   documentNumber: varchar("documentNumber", { length: 64 }).notNull(),
   customerName: varchar("customerName", { length: 255 }),
   payload: text("payload").notNull(),
+  status: mysqlEnum("status", ["draft", "sent", "paid", "overdue"]).notNull().default("draft"),
+  archivedAt: timestamp("archivedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => ({
+  userStatusUpdatedIdx: index("saved_documents_user_status_updated_idx").on(table.userId, table.status, table.updatedAt),
+}));
+
+export const documentExports = mysqlTable("document_exports", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  documentId: int("documentId").notNull().references(() => savedDocuments.id, { onDelete: "cascade" }),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  userDocumentCreatedIdx: index("document_exports_user_document_created_idx").on(table.userId, table.documentId, table.createdAt),
+}));
 
 export const receivables = mysqlTable("receivables", {
   id: int("id").autoincrement().primaryKey(),
@@ -79,7 +93,21 @@ export const payments = mysqlTable("payments", {
   receivableIdx: index("payments_receivable_idx").on(table.receivableId),
 }));
 
+export const receivableEvents = mysqlTable("receivable_events", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  receivableId: int("receivableId").notNull().references(() => receivables.id, { onDelete: "cascade" }),
+  type: mysqlEnum("type", ["created", "payment-recorded"]).notNull(),
+  amount: decimal("amount", { precision: 14, scale: 2 }),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  userReceivableCreatedIdx: index("receivable_events_user_receivable_created_idx").on(table.userId, table.receivableId, table.createdAt),
+}));
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Receivable = typeof receivables.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
+export type ReceivableEvent = typeof receivableEvents.$inferSelect;
+export type DocumentExport = typeof documentExports.$inferSelect;

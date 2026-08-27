@@ -9,6 +9,7 @@ import ComingSoon from "./pages/ComingSoon";
 import CalculatorTool from "./pages/CalculatorTool";
 import Account from "./pages/Account";
 import DocumentTool from "./pages/DocumentTool";
+import DocumentCenter from "./pages/DocumentCenter";
 import Home from "./pages/Home";
 import ToolDirectory from "./pages/ToolDirectory";
 
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/tools" component={ToolDirectory} />
       <Route path="/account" component={Account} />
+      <Route path="/documents" component={DocumentCenter} />
       <Route path="/receivables" component={ReceivablesDashboard} />
       <Route path="/quotation">{() => <DocumentTool kind="quotation" />}</Route>
       <Route path="/invoice">{() => <DocumentTool kind="invoice" />}</Route>

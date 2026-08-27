@@ -259,6 +259,129 @@
   display: none;
 }
 
+.pdf-export-confirmation {
+  width: min(94vw, 46rem);
+  max-height: min(88vh, 54rem);
+  overflow-y: auto;
+  background: #fffdf8;
+}
+
+.pdf-filename-field {
+  display: grid;
+  gap: .42rem;
+  color: #244e4a;
+  font-size: .84rem;
+  font-weight: 700;
+}
+
+.pdf-filename-field input {
+  min-height: 2.7rem;
+  padding: 0 .8rem;
+  border: 1px solid #bfd4ca;
+  border-radius: .62rem;
+  outline: none;
+  color: #183b38;
+  background: #fff;
+  font: inherit;
+  font-weight: 500;
+}
+
+.pdf-filename-field input:focus {
+  border-color: #0d7a75;
+  box-shadow: 0 0 0 3px rgba(13, 122, 117, .14);
+}
+
+.pdf-confirmation-thumbnail {
+  position: relative;
+  min-height: 17rem;
+  overflow: hidden;
+  border: 1px solid #d7d0c4;
+  border-radius: .8rem;
+  background: #e6e1d9;
+}
+
+.pdf-confirmation-thumbnail::after {
+  position: absolute;
+  inset: auto .65rem .65rem auto;
+  z-index: 2;
+  padding: .3rem .5rem;
+  border: 1px solid rgba(21, 56, 54, .16);
+  border-radius: 999px;
+  color: #31534f;
+  background: rgba(255, 253, 248, .92);
+  content: "ตัวอย่างก่อนดาวน์โหลด";
+  font-size: .68rem;
+  font-weight: 700;
+}
+
+.pdf-confirmation-thumbnail .document-preview {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0;
+  transform: scale(.34);
+  transform-origin: top left;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.pdf-export-status {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+  padding: 1.35rem;
+  color: #fffaf0;
+  background: rgba(11, 48, 46, .92);
+  backdrop-filter: blur(7px);
+}
+
+.pdf-export-status > div:last-child { display: grid; gap: .22rem; max-width: 19rem; }
+.pdf-export-status strong { font-size: 1.08rem; }
+.pdf-export-status span { color: #d6e9df; font-size: .87rem; line-height: 1.45; }
+
+.pdf-export-orbit {
+  position: relative;
+  display: grid;
+  width: 4.1rem;
+  height: 4.1rem;
+  flex: 0 0 4.1rem;
+  place-items: center;
+  border: 1px solid rgba(227, 242, 234, .24);
+  border-radius: 50%;
+}
+
+.pdf-export-orbit i {
+  position: absolute;
+  width: .54rem;
+  height: .54rem;
+  border-radius: 50%;
+  background: #e7a281;
+  animation: pdf-export-orbit 1.22s cubic-bezier(.77, 0, .175, 1) infinite;
+}
+
+.pdf-export-orbit i:nth-child(1) { transform: translateX(1.25rem); }
+.pdf-export-orbit i:nth-child(2) { transform: rotate(120deg) translateX(1.25rem); animation-delay: -.4s; }
+.pdf-export-orbit i:nth-child(3) { transform: rotate(240deg) translateX(1.25rem); animation-delay: -.8s; }
+
+@keyframes pdf-export-orbit {
+  0%, 100% { opacity: .34; scale: .72; }
+  50% { opacity: 1; scale: 1.2; }
+}
+
+@media (max-width: 640px) {
+  .pdf-export-confirmation { width: calc(100vw - 1rem); max-height: 93vh; padding: 1rem; }
+  .pdf-confirmation-thumbnail { min-height: 12.8rem; }
+  .pdf-confirmation-thumbnail .document-preview { transform: scale(.255); }
+  .pdf-export-status { align-items: flex-start; padding-top: 30vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pdf-export-orbit i { animation: none; opacity: .88; }
+}
+
 .document-tool-page .pdf-stamp-wrapper.is-editable .pdf-stamp-image {
   filter: drop-shadow(0 0 0.16rem rgba(13, 122, 117, .34));
 }

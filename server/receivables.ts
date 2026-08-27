@@ -71,6 +71,16 @@ export function validatePaymentAmount(totalAmount: number | string, paidAmount: 
   return { valid: true as const, amountCents, outstandingCents };
 }
 
+export function buildReceivableActivityEvent(input: { userId: number; receivableId: number; type: "created" | "payment-recorded"; amount?: number | string | null; note?: string | null }) {
+  return {
+    userId: input.userId,
+    receivableId: input.receivableId,
+    type: input.type,
+    amount: input.amount === null || input.amount === undefined ? null : centsToMoney(moneyToCents(input.amount)),
+    note: input.note?.trim() || null,
+  };
+}
+
 export function parseDateOnly(value: string, endOfDay = false) {
   const date = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`);
   if (Number.isNaN(date.getTime())) throw new Error("รูปแบบวันที่ไม่ถูกต้อง");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountToThaiWords, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampRotation, boundedStampScale, calculateDocumentTotals, convertDocument, createInitialDocument, restoreDocument } from "./document";
+import { amountToThaiWords, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampRotation, boundedStampScale, calculateDocumentTotals, convertDocument, createHydrationSafeInitialDocument, createInitialDocument, restoreDocument } from "./document";
 
 describe("document calculations", () => {
   it("calculates an excluded VAT document with discount", () => {
@@ -63,6 +63,11 @@ describe("document calculations", () => {
     document.fontSize = "large";
     const restored = restoreDocument(JSON.stringify(convertDocument(document, "invoice")), "invoice");
     expect(restored).toMatchObject({ template: "minimal", accentColor: "#7c3aed", fontFamily: "noto-serif", fontSize: "large" });
+  });
+
+  it("uses a deterministic placeholder during SSR hydration before live document dates are restored", () => {
+    expect(createHydrationSafeInitialDocument("quotation")).toEqual(createHydrationSafeInitialDocument("quotation"));
+    expect(createHydrationSafeInitialDocument("quotation")).toMatchObject({ documentNumber: "QT-200001-001", issueDate: "2000-01-01", dueDate: "2000-01-31", items: [{ id: "hydration-quotation-item" }] });
   });
 
   it("converts a quotation to every downstream document while preserving company, customer, and items", () => {

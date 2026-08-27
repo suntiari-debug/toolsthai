@@ -7,7 +7,7 @@ import DocumentPreview from "@/components/DocumentPreview";
 import DocumentSeoContent from "@/components/DocumentSeoContent";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { BusinessDocument, DocumentKind, LineItem, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampRotation, boundedStampScale, calculateDocumentTotals, convertDocument, createInitialDocument, defaultLogoCrop, defaultLogoPosition, defaultLogoScale, defaultStampPosition, defaultStampRotation, defaultStampScale, documentMeta, formatTHB, makeDocumentNumber, restoreDocument } from "@/lib/document";
+import { BusinessDocument, DocumentKind, LineItem, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampRotation, boundedStampScale, calculateDocumentTotals, convertDocument, createHydrationSafeInitialDocument, createInitialDocument, defaultLogoCrop, defaultLogoPosition, defaultLogoScale, defaultStampPosition, defaultStampRotation, defaultStampScale, documentMeta, formatTHB, makeDocumentNumber, restoreDocument } from "@/lib/document";
 import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
@@ -18,11 +18,13 @@ import { getDocumentValidationIssues } from "@/lib/documentValidation";
 import { businessDocumentTemplates, documentFontChoices, documentFontSizeChoices, normalizeDocumentAccentColor, normalizeDocumentFontFamily, normalizeDocumentFontSize, normalizeDocumentTemplate, type DocumentDesignSettings, type DocumentTemplate } from "@/lib/documentDesign";
 import { createLogoPresetExport, filterLogoPresets, LEGACY_LOGO_PRESETS_STORAGE_KEY, LOGO_PRESETS_STORAGE_KEY, logoPresetCategories, MAX_LOGO_PRESET_IMPORT_BYTES, MAX_LOGO_PRESETS, mergeLogoPresets, parseLogoPresetImport, parseStoredPreviewHighlight, PREVIEW_HIGHLIGHT_PREFERENCE_STORAGE_KEY, sanitizeLogoPresets, serializeLogoPresets, type LogoPreset, type LogoPresetCategory } from "@/lib/documentPreferences";
 import { getItemPreviewHighlightTarget, getPreviewHighlightTarget, type PreviewHighlightTarget } from "@/lib/previewHighlight";
+import { sanitizePdfFilename } from "@/lib/pdfExport";
 import "../styles/document-typography.css";
 import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollBehavior, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
 
 type DocumentToolProps = { kind: DocumentKind };
 type RemovedLogo = { logoUrl: string; position: { x: number; y: number }; scale: number; crop: NonNullable<BusinessDocument["logoCrop"]> };
+type PdfExportStage = "preparing" | "rendering" | "downloading";
 
 const convertTargets: Record<DocumentKind, DocumentKind[]> = {
   quotation: ["invoice", "receipt", "delivery-note"],
@@ -43,9 +45,12 @@ const accentChoices = ["#0d7a75", "#2563d9", "#bd1f2d", "#7c3aed", "#17191c", "#
 export default function DocumentTool({ kind }: DocumentToolProps) {
   const [, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
-  const [document, setDocument] = useState<BusinessDocument>(() => createInitialDocument(kind));
+  const [document, setDocument] = useState<BusinessDocument>(() => createHydrationSafeInitialDocument(kind));
   const [notice, setNotice] = useState("");
   const [isExporting, setIsExporting] = useState(false);
+  const [pdfExportStage, setPdfExportStage] = useState<PdfExportStage | null>(null);
+  const [isPdfConfirmationOpen, setIsPdfConfirmationOpen] = useState(false);
+  const [pdfFilename, setPdfFilename] = useState("");
   const [previewZoom, setPreviewZoom] = useState<PreviewZoom>(0);
   const [previewPan, setPreviewPan] = useState<PreviewPan>({ x: 0, y: 0 });
   const [isPreviewZoomRestored, setIsPreviewZoomRestored] = useState(false);
@@ -82,6 +87,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     onSuccess: () => flashNotice("บันทึกเอกสารเข้าบัญชีของคุณแล้ว"),
     onError: () => flashNotice("ไม่สามารถบันทึกเอกสารได้ กรุณาลองใหม่อีกครั้ง"),
   });
+  const recordDocumentExport = trpc.documents.recordExportForDocument.useMutation();
   const meta = documentMeta[kind];
   const seo = getDocumentSeo(kind);
   const totals = useMemo(() => calculateDocumentTotals(document), [document]);
@@ -402,14 +408,22 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActivePreviewHighlight(null);
   };
 
-  const exportPdf = async () => {
+  const makePersistableDocument = () => {
+    const profileLogo = profileQuery.data?.logoUrl || "";
+    return { ...document, company: { ...document.company, logoUrl: document.company.logoUrl.startsWith("blob:") ? profileLogo : document.company.logoUrl }, signatureUrl: document.signatureUrl?.startsWith("blob:") ? profileQuery.data?.signatureUrl || "" : document.signatureUrl, stampUrl: document.stampUrl?.startsWith("blob:") ? profileQuery.data?.stampUrl || "" : document.stampUrl };
+  };
+
+  const exportPdf = async (requestedFilename: string) => {
     const printable = window.document.getElementById("printable-document");
     if (!printable || isExporting) return;
     setIsExporting(true);
+    setIsPdfConfirmationOpen(false);
+    setPdfExportStage("preparing");
     setActivePreviewHighlight(null);
     try {
       await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
       await window.document.fonts?.ready;
+      setPdfExportStage("rendering");
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
       const canvas = await html2canvas(printable, { backgroundColor: "#ffffff", scale: 2.5, useCORS: true, logging: false, windowWidth: printable.scrollWidth });
       const imageData = canvas.toDataURL("image/jpeg", 0.98);
@@ -427,12 +441,28 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
         pdf.addImage(imageData, "JPEG", 0, position, pageWidth, imageHeight, undefined, "FAST");
         heightLeft -= pageHeight;
       }
-      pdf.save(`${document.documentNumber || documentMeta[kind].prefix}.pdf`);
+      const filename = sanitizePdfFilename(requestedFilename, document.documentNumber || documentMeta[kind].prefix);
+      setPdfExportStage("downloading");
+      pdf.save(filename);
+      if (isAuthenticated) {
+        try {
+          const persistable = makePersistableDocument();
+          await recordDocumentExport.mutateAsync({ kind: document.kind, documentNumber: document.documentNumber || makeDocumentNumber(kind), customerName: document.customer.name || undefined, payload: JSON.stringify(persistable), filename });
+          flashNotice("เริ่มดาวน์โหลด PDF และบันทึกประวัติในคลังเอกสารแล้ว");
+        } catch {
+          flashNotice("เริ่มดาวน์โหลด PDF แล้ว แต่ยังบันทึกประวัติไม่สำเร็จ");
+        }
+      }
     } catch {
       flashNotice("ไม่สามารถสร้าง PDF ได้ กรุณาลองใหม่อีกครั้ง");
     } finally {
-      setIsExporting(false);
+      window.setTimeout(() => { setIsExporting(false); setPdfExportStage(null); }, 480);
     }
+  };
+
+  const openPdfConfirmation = () => {
+    setPdfFilename(sanitizePdfFilename(document.documentNumber || documentMeta[kind].prefix, documentMeta[kind].prefix));
+    setIsPdfConfirmationOpen(true);
   };
 
   const requestPdfExport = () => {
@@ -440,7 +470,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
       setIsPdfValidationOpen(true);
       return;
     }
-    void exportPdf();
+    openPdfConfirmation();
   };
 
   const handleConvert = (target: DocumentKind) => {
@@ -469,8 +499,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   };
   const handleAccountSave = () => {
     if (!isAuthenticated) { startLogin(); return; }
-    const profileLogo = profileQuery.data?.logoUrl || "";
-    const persistable = { ...document, company: { ...document.company, logoUrl: document.company.logoUrl.startsWith("blob:") ? profileLogo : document.company.logoUrl }, signatureUrl: document.signatureUrl?.startsWith("blob:") ? profileQuery.data?.signatureUrl || "" : document.signatureUrl, stampUrl: document.stampUrl?.startsWith("blob:") ? profileQuery.data?.stampUrl || "" : document.stampUrl };
+    const persistable = makePersistableDocument();
     saveDocument.mutate({ kind: document.kind, documentNumber: document.documentNumber || makeDocumentNumber(kind), customerName: document.customer.name || undefined, payload: JSON.stringify(persistable) });
   };
 
@@ -490,7 +519,9 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
           <span className="autosave-status"><span>✓</span> บันทึกอัตโนมัติในอุปกรณ์</span>
         </div>
         {notice && <div className="draft-toast print-hide"><ShieldCheck size={17} /> {notice}</div>}
-        <AlertDialog open={isPdfValidationOpen} onOpenChange={setIsPdfValidationOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ตรวจข้อมูลสำคัญก่อนดาวน์โหลด PDF</AlertDialogTitle><AlertDialogDescription>พบข้อมูลที่ควรตรวจทานก่อนสร้าง PDF คุณสามารถกลับไปแก้ไข หรือดาวน์โหลดต่อได้หากยืนยันว่าข้อมูลถูกต้องแล้ว</AlertDialogDescription></AlertDialogHeader><ul className="pdf-validation-list">{pdfValidationIssues.map((issue) => <li key={issue.id}><strong>{issue.label}</strong><span>{issue.message}</span></li>)}</ul><AlertDialogFooter><AlertDialogCancel>กลับไปแก้ไข</AlertDialogCancel><AlertDialogAction onClick={() => { setIsPdfValidationOpen(false); void exportPdf(); }}>ดาวน์โหลดต่อ</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+        {pdfExportStage && <div className="pdf-export-status" role="status" aria-live="polite"><div className="pdf-export-orbit" aria-hidden="true"><i /><i /><i /></div><div><strong>{pdfExportStage === "preparing" ? "กำลังเตรียมเอกสาร" : pdfExportStage === "rendering" ? "กำลังเรนเดอร์ PDF" : "กำลังเริ่มดาวน์โหลด"}</strong><span>{pdfExportStage === "preparing" ? "ตรวจสอบรูปแบบและข้อมูลเอกสาร" : pdfExportStage === "rendering" ? "กำลังจัดวางเอกสารให้พร้อมดาวน์โหลด" : "ไฟล์ PDF จะถูกบันทึกลงในอุปกรณ์ของคุณ"}</span></div></div>}
+        <AlertDialog open={isPdfValidationOpen} onOpenChange={setIsPdfValidationOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ตรวจข้อมูลสำคัญก่อนดาวน์โหลด PDF</AlertDialogTitle><AlertDialogDescription>พบข้อมูลที่ควรตรวจทานก่อนสร้าง PDF คุณสามารถกลับไปแก้ไข หรือดาวน์โหลดต่อได้หากยืนยันว่าข้อมูลถูกต้องแล้ว</AlertDialogDescription></AlertDialogHeader><ul className="pdf-validation-list">{pdfValidationIssues.map((issue) => <li key={issue.id}><strong>{issue.label}</strong><span>{issue.message}</span></li>)}</ul><AlertDialogFooter><AlertDialogCancel>กลับไปแก้ไข</AlertDialogCancel><AlertDialogAction onClick={() => { setIsPdfValidationOpen(false); openPdfConfirmation(); }}>ตรวจ preview และดาวน์โหลด</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+        <Dialog open={isPdfConfirmationOpen} onOpenChange={setIsPdfConfirmationOpen}><DialogContent className="pdf-export-confirmation"><DialogHeader><DialogTitle>ตรวจ preview และตั้งชื่อไฟล์ PDF</DialogTitle><DialogDescription>ตรวจเอกสารฉบับย่อด้านล่าง แล้วตั้งชื่อไฟล์ก่อนยืนยันดาวน์โหลด</DialogDescription></DialogHeader><label className="pdf-filename-field"><span>ชื่อไฟล์</span><input value={pdfFilename} onChange={(event) => setPdfFilename(event.target.value)} onBlur={() => setPdfFilename((current) => sanitizePdfFilename(current, document.documentNumber || documentMeta[kind].prefix))} maxLength={184} aria-label="ชื่อไฟล์ PDF" /></label><div className="pdf-confirmation-thumbnail" aria-label="ตัวอย่างเอกสารก่อนดาวน์โหลด"><DocumentPreview document={document} previewId="pdf-confirmation-preview" accentColor={accentColor} template={template} fontFamily={fontFamily} fontSize={fontSize} /></div><DialogFooter><button type="button" className="workspace-action" onClick={() => setIsPdfConfirmationOpen(false)}>กลับไปแก้ไข</button><button type="button" className="button button-download" onClick={() => void exportPdf(pdfFilename)}><Download size={16} /> ยืนยันและดาวน์โหลด</button></DialogFooter></DialogContent></Dialog>
         <Dialog open={isLogoEditorOpen} onOpenChange={setIsLogoEditorOpen}><DialogContent className="logo-editor-dialog"><DialogHeader><DialogTitle>ครอปและปรับแต่งโลโก้</DialogTitle><DialogDescription>ปรับมุมมองโลโก้ก่อนใช้ในหัวเอกสาร การเปลี่ยนแปลงจะแสดงใน preview และ PDF ทันที</DialogDescription></DialogHeader>{document.company.logoUrl && <><div className="logo-crop-preview"><img src={document.company.logoUrl} alt="ตัวอย่างการครอปโลโก้" style={{ "--logo-crop-x": `${logoCrop.x}%`, "--logo-crop-y": `${logoCrop.y}%`, "--logo-crop-zoom": String(logoCrop.zoom), "--logo-brightness": `${logoCrop.brightness}%`, "--logo-contrast": `${logoCrop.contrast}%` } as CSSProperties} /></div><div className="logo-editor-controls"><label>ซูม <input type="range" min="1" max="2.4" step="0.05" value={logoCrop.zoom} onChange={(event) => updateLogoCrop({ zoom: Number(event.target.value) })} /><output>{Math.round(logoCrop.zoom * 100)}%</output></label><label>เลื่อนซ้าย–ขวา <input type="range" min="-34" max="34" step="1" value={logoCrop.x} onChange={(event) => updateLogoCrop({ x: Number(event.target.value) })} /><output>{logoCrop.x}</output></label><label>เลื่อนขึ้น–ลง <input type="range" min="-34" max="34" step="1" value={logoCrop.y} onChange={(event) => updateLogoCrop({ y: Number(event.target.value) })} /><output>{logoCrop.y}</output></label><label>ความสว่าง <input type="range" min="70" max="130" step="1" value={logoCrop.brightness} onChange={(event) => updateLogoCrop({ brightness: Number(event.target.value) })} /><output>{logoCrop.brightness}%</output></label><label>ความคมชัด <input type="range" min="70" max="130" step="1" value={logoCrop.contrast} onChange={(event) => updateLogoCrop({ contrast: Number(event.target.value) })} /><output>{logoCrop.contrast}%</output></label></div></>}<DialogFooter><button type="button" className="workspace-action" onClick={() => updateDocument("logoCrop", { ...defaultLogoCrop })}>รีเซ็ตการปรับแต่ง</button><button type="button" className="button button-download" onClick={() => setIsLogoEditorOpen(false)}>ใช้กับเอกสาร</button></DialogFooter></DialogContent></Dialog>
         <div className="shell document-grid reference-document-grid">
           <section className="document-form-card reference-form-panel print-hide" onFocusCapture={handleFormFocus} onBlurCapture={handleFormBlur} onClickCapture={handleFormClick}>
