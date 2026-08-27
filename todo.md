@@ -80,4 +80,4 @@
 - [x] เพิ่ม upload area/progress/retry/preview/view/delete confirm ใน payment modal และ detail สำหรับ desktop/mobile
 - [x] เพิ่ม tests MIME/size/owner authorization/delete semantics/audit และ browser QA upload-view-delete ด้วย test fixture เท่านั้น
 - [x] เพิ่ม direct attachment list contract และ test ว่า owner อื่นอ่านไม่ได้หรือรับ storageKey ไม่ได้
-- [ ] ตรวจ regression, commit/push และสร้าง checkpoint payment attachments หลังผ่าน QA
+- [x] ตรวจ regression, commit/push และสร้าง checkpoint payment attachments หลังผ่าน QA
