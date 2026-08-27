@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CANONICAL_ORIGIN, documentCenterSeo, documentSeo, getSeoHead, homeSeo } from "@shared/seo";
+import { CANONICAL_ORIGIN, documentSeo, getSeoHead, homeSeo } from "@shared/seo";
 
 describe("Home SEO head", () => {
   it("returns an indexable canonical head with WebSite structured data", () => {
@@ -17,22 +17,5 @@ describe("Home SEO head", () => {
     expect(head.title).toBe("สร้างใบเสนอราคาออนไลน์ฟรี พร้อม PDF และโลโก้ | Tools Thai");
     expect(head.title).toBe(documentSeo.quotation.title);
     expect(documentSeo.quotation.h1).toBe("สร้างใบเสนอราคาออนไลน์ฟรี ไม่ต้องสมัคร");
-  });
-
-  it("uses a supplied deployment origin in JSON-LD structured data", () => {
-    const origin = "https://new-tools-thai.example.com";
-    const head = getSeoHead("/quotation", origin);
-    const breadcrumb = head.jsonLd.find((entry) => (entry as { [key: string]: unknown })["@type"] === "BreadcrumbList") as { itemListElement: Array<{ item: string }> };
-
-    expect(breadcrumb.itemListElement[0]?.item).toBe(origin);
-    expect(breadcrumb.itemListElement[2]?.item).toBe(`${origin}/quotation`);
-  });
-
-  it("returns a dedicated canonical path for the signed-in document center", () => {
-    const head = getSeoHead("/documents", "https://new-tools-thai.example.com");
-
-    expect(head.title).toBe(documentCenterSeo.title);
-    expect(head.canonicalPath).toBe("/documents");
-    expect(head.jsonLd).toEqual([]);
   });
 });

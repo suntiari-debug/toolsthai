@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "6bd2de1c-a27a-4603-988a-d84dd1ce93be",
-  "prevId": "c74f2e31-b0c8-40b9-9830-74b3b51d9895",
+  "id": "ec1f8713-3179-498a-9c04-b4ba10399b78",
+  "prevId": "6bd2de1c-a27a-4603-988a-d84dd1ce93be",
   "tables": {
     "company_profiles": {
       "name": "company_profiles",
@@ -169,6 +169,96 @@
           ]
         }
       },
+      "checkConstraint": {}
+    },
+    "document_exports": {
+      "name": "document_exports",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "documentId": {
+          "name": "documentId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "filename": {
+          "name": "filename",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {
+        "document_exports_user_document_created_idx": {
+          "name": "document_exports_user_document_created_idx",
+          "columns": [
+            "userId",
+            "documentId",
+            "createdAt"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "document_exports_userId_users_id_fk": {
+          "name": "document_exports_userId_users_id_fk",
+          "tableFrom": "document_exports",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "document_exports_documentId_saved_documents_id_fk": {
+          "name": "document_exports_documentId_saved_documents_id_fk",
+          "tableFrom": "document_exports",
+          "tableTo": "saved_documents",
+          "columnsFrom": [
+            "documentId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "document_exports_id": {
+          "name": "document_exports_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
       "checkConstraint": {}
     },
     "payments": {
@@ -616,6 +706,21 @@
           "notNull": true,
           "autoincrement": false
         },
+        "status": {
+          "name": "status",
+          "type": "enum('draft','sent','paid','overdue')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'draft'"
+        },
+        "archivedAt": {
+          "name": "archivedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -634,7 +739,17 @@
           "default": "(now())"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "saved_documents_user_status_updated_idx": {
+          "name": "saved_documents_user_status_updated_idx",
+          "columns": [
+            "userId",
+            "status",
+            "updatedAt"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {
         "saved_documents_userId_users_id_fk": {
           "name": "saved_documents_userId_users_id_fk",

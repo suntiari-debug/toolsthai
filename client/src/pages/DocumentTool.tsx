@@ -1,34 +1,30 @@
 import { ChangeEvent, type CSSProperties, TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, ArrowRight, CheckCircle2, Download, Eye, EyeOff, FileDown, FilePlus2, Info, LoaderCircle, Plus, Printer, RotateCcw, Save, Search, ShieldCheck, Tags, Trash2, Undo2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Eye, EyeOff, FileDown, FilePlus2, Info, Plus, Printer, RotateCcw, Save, Search, ShieldCheck, Tags, Trash2, Undo2, Upload, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
 import PublicFooter from "@/components/PublicFooter";
 import PublicHeader from "@/components/PublicHeader";
 import DocumentPreview from "@/components/DocumentPreview";
 import DocumentSeoContent from "@/components/DocumentSeoContent";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { BusinessDocument, DocumentKind, LineItem, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampRotation, boundedStampScale, calculateDocumentTotals, convertDocument, createInitialDocument, defaultLogoCrop, defaultLogoPosition, defaultLogoScale, defaultStampPosition, defaultStampRotation, defaultStampScale, documentMeta, formatTHB, makeDocumentNumber, restoreDocument } from "@/lib/document";
+import { BusinessDocument, DocumentKind, LineItem, boundedLogoCrop, boundedLogoPosition, boundedLogoScale, boundedStampPosition, boundedStampRotation, boundedStampScale, calculateDocumentTotals, convertDocument, createHydrationSafeInitialDocument, createInitialDocument, defaultLogoCrop, defaultLogoPosition, defaultLogoScale, defaultStampPosition, defaultStampRotation, defaultStampScale, documentMeta, formatTHB, makeDocumentNumber, restoreDocument } from "@/lib/document";
 import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import SeoMeta from "@/components/SeoMeta";
 import { getDocumentSeo, getDocumentStructuredData } from "@shared/seo";
-import { getClientCanonicalOrigin } from "@/lib/seoOrigin";
 import { isTemporaryDocumentAssetUrl, readDocumentAssetAsDataUrl, validateDocumentAssetFile } from "@/lib/documentAssets";
 import { getDocumentValidationIssues } from "@/lib/documentValidation";
 import { businessDocumentTemplates, documentFontChoices, documentFontSizeChoices, normalizeDocumentAccentColor, normalizeDocumentFontFamily, normalizeDocumentFontSize, normalizeDocumentTemplate, type DocumentDesignSettings, type DocumentTemplate } from "@/lib/documentDesign";
 import { createLogoPresetExport, filterLogoPresets, LEGACY_LOGO_PRESETS_STORAGE_KEY, LOGO_PRESETS_STORAGE_KEY, logoPresetCategories, MAX_LOGO_PRESET_IMPORT_BYTES, MAX_LOGO_PRESETS, mergeLogoPresets, parseLogoPresetImport, parseStoredPreviewHighlight, PREVIEW_HIGHLIGHT_PREFERENCE_STORAGE_KEY, sanitizeLogoPresets, serializeLogoPresets, type LogoPreset, type LogoPresetCategory } from "@/lib/documentPreferences";
 import { getItemPreviewHighlightTarget, getPreviewHighlightTarget, type PreviewHighlightTarget } from "@/lib/previewHighlight";
-import { restoreDocumentResume } from "@/lib/documentCenterNavigation";
-import { buildPdfFilename } from "@/lib/pdfFilename";
-import { getPdfExportStageIndex, pdfExportStages, runPdfExportLifecycle, type PdfExportStage } from "@/lib/pdfExportStatus";
+import { sanitizePdfFilename } from "@/lib/pdfExport";
 import "../styles/document-typography.css";
 import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollBehavior, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
 
 type DocumentToolProps = { kind: DocumentKind };
 type RemovedLogo = { logoUrl: string; position: { x: number; y: number }; scale: number; crop: NonNullable<BusinessDocument["logoCrop"]> };
-type PdfExportModules = [typeof import("html2canvas"), typeof import("jspdf")];
-type PdfDocument = InstanceType<(typeof import("jspdf"))["jsPDF"]>;
+type PdfExportStage = "preparing" | "rendering" | "downloading";
 
 const convertTargets: Record<DocumentKind, DocumentKind[]> = {
   quotation: ["invoice", "receipt", "delivery-note"],
@@ -45,30 +41,25 @@ const templateChoices: Array<{ id: DocumentTemplate; title: string; description:
 ];
 
 const accentChoices = ["#0d7a75", "#2563d9", "#bd1f2d", "#7c3aed", "#17191c", "#d97706"];
-const HYDRATION_SEED_DATE = new Date("2000-06-15T12:00:00.000Z");
-
-function createHydrationSeedDocument(kind: DocumentKind) {
-  return createInitialDocument(kind, { now: HYDRATION_SEED_DATE, itemId: `hydration-${kind}-item` });
-}
 
 export default function DocumentTool({ kind }: DocumentToolProps) {
   const [, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
-  const [document, setDocument] = useState<BusinessDocument>(() => createHydrationSeedDocument(kind));
+  const [document, setDocument] = useState<BusinessDocument>(() => createHydrationSafeInitialDocument(kind));
   const [notice, setNotice] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
   const [pdfExportStage, setPdfExportStage] = useState<PdfExportStage | null>(null);
-  const isExporting = pdfExportStage !== null;
+  const [isPdfConfirmationOpen, setIsPdfConfirmationOpen] = useState(false);
+  const [pdfFilename, setPdfFilename] = useState("");
   const [previewZoom, setPreviewZoom] = useState<PreviewZoom>(0);
   const [previewPan, setPreviewPan] = useState<PreviewPan>({ x: 0, y: 0 });
   const [isPreviewZoomRestored, setIsPreviewZoomRestored] = useState(false);
   const [isPreviewResetAnimating, setIsPreviewResetAnimating] = useState(false);
-  const [previewZoomDevice, setPreviewZoomDevice] = useState<PreviewZoomDevice>("desktop");
+  const [previewZoomDevice, setPreviewZoomDevice] = useState<PreviewZoomDevice>(() => typeof window === "undefined" ? "desktop" : getPreviewZoomDevice(window.innerWidth));
   const [activePreviewHighlight, setActivePreviewHighlight] = useState<PreviewHighlightTarget | null>(null);
   const [isPreviewHighlightEnabled, setIsPreviewHighlightEnabled] = useState(true);
   const [isPreviewHighlightRestored, setIsPreviewHighlightRestored] = useState(false);
   const [isPdfValidationOpen, setIsPdfValidationOpen] = useState(false);
-  const [isPdfConfirmOpen, setIsPdfConfirmOpen] = useState(false);
-  const [pdfFilename, setPdfFilename] = useState("");
   const [isLogoRemoveOpen, setIsLogoRemoveOpen] = useState(false);
   const [isLogoEditorOpen, setIsLogoEditorOpen] = useState(false);
   const [lastRemovedLogo, setLastRemovedLogo] = useState<RemovedLogo | null>(null);
@@ -96,11 +87,9 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     onSuccess: () => flashNotice("บันทึกเอกสารเข้าบัญชีของคุณแล้ว"),
     onError: () => flashNotice("ไม่สามารถบันทึกเอกสารได้ กรุณาลองใหม่อีกครั้ง"),
   });
-  const recordPdfExport = trpc.documents.recordExport.useMutation();
+  const recordDocumentExport = trpc.documents.recordExportForDocument.useMutation();
   const meta = documentMeta[kind];
   const seo = getDocumentSeo(kind);
-  const seoOrigin = getClientCanonicalOrigin();
-  const structuredData = useMemo(() => getDocumentStructuredData(kind, seoOrigin), [kind, seoOrigin]);
   const totals = useMemo(() => calculateDocumentTotals(document), [document]);
   const template = normalizeDocumentTemplate(document.template);
   const accentColor = normalizeDocumentAccentColor(document.accentColor);
@@ -279,8 +268,16 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const clearPreviewTouch = () => { pinchState.current = null; panState.current = null; singleTouchState.current = null; };
 
   useEffect(() => {
-    const resumedDocument = restoreDocumentResume(window.sessionStorage, kind);
-    if (resumedDocument) { setDocument(resumedDocument); return; }
+    const saved = window.sessionStorage.getItem("toolsThai.convertedDocument");
+    if (saved) {
+      try {
+        setDocument(restoreDocument(saved, kind));
+        window.sessionStorage.removeItem("toolsThai.convertedDocument");
+        return;
+      } catch {
+        window.sessionStorage.removeItem("toolsThai.convertedDocument");
+      }
+    }
     setDocument(createInitialDocument(kind));
   }, [kind]);
 
@@ -411,72 +408,69 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActivePreviewHighlight(null);
   };
 
-  const getPersistableDocument = () => {
+  const makePersistableDocument = () => {
     const profileLogo = profileQuery.data?.logoUrl || "";
     return { ...document, company: { ...document.company, logoUrl: document.company.logoUrl.startsWith("blob:") ? profileLogo : document.company.logoUrl }, signatureUrl: document.signatureUrl?.startsWith("blob:") ? profileQuery.data?.signatureUrl || "" : document.signatureUrl, stampUrl: document.stampUrl?.startsWith("blob:") ? profileQuery.data?.stampUrl || "" : document.stampUrl };
   };
-  const exportPdf = async (filename: string) => {
+
+  const exportPdf = async (requestedFilename: string) => {
     const printable = window.document.getElementById("printable-document");
     if (!printable || isExporting) return;
+    setIsExporting(true);
+    setIsPdfConfirmationOpen(false);
+    setPdfExportStage("preparing");
     setActivePreviewHighlight(null);
     try {
-      await runPdfExportLifecycle({
-        setStage: setPdfExportStage,
-        prepare: async (): Promise<PdfExportModules> => {
-          await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
-          await window.document.fonts?.ready;
-          return Promise.all([import("html2canvas"), import("jspdf")]);
-        },
-        render: async ([{ default: html2canvas }, { jsPDF }]: PdfExportModules): Promise<PdfDocument> => {
-          const canvas = await html2canvas(printable, { backgroundColor: "#ffffff", scale: 2.5, useCORS: true, logging: false, windowWidth: printable.scrollWidth });
-          const imageData = canvas.toDataURL("image/jpeg", 0.98);
-          const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
-          const pageWidth = 210;
-          const pageHeight = 297;
-          const imageHeight = (canvas.height * pageWidth) / canvas.width;
-          let heightLeft = imageHeight;
-          let position = 0;
-          pdf.addImage(imageData, "JPEG", 0, position, pageWidth, imageHeight, undefined, "FAST");
-          heightLeft -= pageHeight;
-          while (heightLeft > 0) {
-            position = heightLeft - imageHeight;
-            pdf.addPage();
-            pdf.addImage(imageData, "JPEG", 0, position, pageWidth, imageHeight, undefined, "FAST");
-            heightLeft -= pageHeight;
-          }
-          return pdf;
-        },
-        download: async (pdf: PdfDocument) => {
-          await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
-          pdf.save(filename);
-          if (isAuthenticated) {
-            try {
-              await recordPdfExport.mutateAsync({ kind: document.kind, documentNumber: document.documentNumber || makeDocumentNumber(kind), customerName: document.customer.name || undefined, payload: JSON.stringify(getPersistableDocument()), filename });
-              flashNotice("เริ่มดาวน์โหลด PDF และบันทึกประวัติไว้แล้ว");
-            } catch {
-              flashNotice("เริ่มดาวน์โหลด PDF แล้ว แต่ยังบันทึกประวัติไม่สำเร็จ");
-            }
-          } else {
-            flashNotice("เริ่มดาวน์โหลดไฟล์ PDF แล้ว");
-          }
-          await new Promise<void>((resolve) => window.setTimeout(resolve, 420));
-        },
-      });
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+      await window.document.fonts?.ready;
+      setPdfExportStage("rendering");
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
+      const canvas = await html2canvas(printable, { backgroundColor: "#ffffff", scale: 2.5, useCORS: true, logging: false, windowWidth: printable.scrollWidth });
+      const imageData = canvas.toDataURL("image/jpeg", 0.98);
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const imageHeight = (canvas.height * pageWidth) / canvas.width;
+      let heightLeft = imageHeight;
+      let position = 0;
+      pdf.addImage(imageData, "JPEG", 0, position, pageWidth, imageHeight, undefined, "FAST");
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position = heightLeft - imageHeight;
+        pdf.addPage();
+        pdf.addImage(imageData, "JPEG", 0, position, pageWidth, imageHeight, undefined, "FAST");
+        heightLeft -= pageHeight;
+      }
+      const filename = sanitizePdfFilename(requestedFilename, document.documentNumber || documentMeta[kind].prefix);
+      setPdfExportStage("downloading");
+      pdf.save(filename);
+      if (isAuthenticated) {
+        try {
+          const persistable = makePersistableDocument();
+          await recordDocumentExport.mutateAsync({ kind: document.kind, documentNumber: document.documentNumber || makeDocumentNumber(kind), customerName: document.customer.name || undefined, payload: JSON.stringify(persistable), filename });
+          flashNotice("เริ่มดาวน์โหลด PDF และบันทึกประวัติในคลังเอกสารแล้ว");
+        } catch {
+          flashNotice("เริ่มดาวน์โหลด PDF แล้ว แต่ยังบันทึกประวัติไม่สำเร็จ");
+        }
+      }
     } catch {
       flashNotice("ไม่สามารถสร้าง PDF ได้ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      window.setTimeout(() => { setIsExporting(false); setPdfExportStage(null); }, 480);
     }
   };
 
-  const openPdfConfirm = () => {
-    setPdfFilename(buildPdfFilename(document.documentNumber, documentMeta[kind].prefix));
-    setIsPdfConfirmOpen(true);
+  const openPdfConfirmation = () => {
+    setPdfFilename(sanitizePdfFilename(document.documentNumber || documentMeta[kind].prefix, documentMeta[kind].prefix));
+    setIsPdfConfirmationOpen(true);
   };
+
   const requestPdfExport = () => {
     if (pdfValidationIssues.length > 0) {
       setIsPdfValidationOpen(true);
       return;
     }
-    openPdfConfirm();
+    openPdfConfirmation();
   };
 
   const handleConvert = (target: DocumentKind) => {
@@ -505,12 +499,13 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   };
   const handleAccountSave = () => {
     if (!isAuthenticated) { startLogin(); return; }
-    saveDocument.mutate({ kind: document.kind, documentNumber: document.documentNumber || makeDocumentNumber(kind), customerName: document.customer.name || undefined, payload: JSON.stringify(getPersistableDocument()) });
+    const persistable = makePersistableDocument();
+    saveDocument.mutate({ kind: document.kind, documentNumber: document.documentNumber || makeDocumentNumber(kind), customerName: document.customer.name || undefined, payload: JSON.stringify(persistable) });
   };
 
   return (
     <div className="app-page document-tool-page">
-      <SeoMeta title={seo?.title || `${meta.title} ออนไลน์ฟรี`} description={seo?.description || `${meta.intro} สร้างและดาวน์โหลดเป็น PDF ได้ฟรีด้วย Tools Thai`} canonicalPath={seo?.path || `/${kind}`} structuredData={structuredData} />
+      <SeoMeta title={seo?.title || `${meta.title} ออนไลน์ฟรี`} description={seo?.description || `${meta.intro} สร้างและดาวน์โหลดเป็น PDF ได้ฟรีด้วย Tools Thai`} canonicalPath={seo?.path || `/${kind}`} structuredData={getDocumentStructuredData(kind)} />
       <PublicHeader />
       <main className="document-workspace reference-document-workspace">
         <div className="shell document-topbar reference-topbar print-hide">
@@ -524,9 +519,9 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
           <span className="autosave-status"><span>✓</span> บันทึกอัตโนมัติในอุปกรณ์</span>
         </div>
         {notice && <div className="draft-toast print-hide"><ShieldCheck size={17} /> {notice}</div>}
-        {pdfExportStage && <div className="pdf-export-overlay print-hide" role="status" aria-live="assertive" aria-label="กำลังสร้างไฟล์ PDF"><div className="pdf-export-dialog"><div className="pdf-export-orbit"><LoaderCircle size={29} /><span>PDF</span></div><div className="pdf-export-copy"><p>กำลังจัดทำเอกสารของคุณ</p><h2>{pdfExportStages[getPdfExportStageIndex(pdfExportStage)].title}</h2><span>{pdfExportStages[getPdfExportStageIndex(pdfExportStage)].detail}</span></div><ol className="pdf-export-steps">{pdfExportStages.map((stage, index) => <li key={stage.id} className={index < getPdfExportStageIndex(pdfExportStage) ? "is-complete" : index === getPdfExportStageIndex(pdfExportStage) ? "is-active" : ""}>{index < getPdfExportStageIndex(pdfExportStage) ? <CheckCircle2 size={14} /> : <i>{index + 1}</i>}<span>{stage.title}</span></li>)}</ol></div></div>}
-        <AlertDialog open={isPdfValidationOpen} onOpenChange={setIsPdfValidationOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ตรวจข้อมูลสำคัญก่อนดาวน์โหลด PDF</AlertDialogTitle><AlertDialogDescription>พบข้อมูลที่ควรตรวจทานก่อนสร้าง PDF คุณสามารถกลับไปแก้ไข หรือดาวน์โหลดต่อได้หากยืนยันว่าข้อมูลถูกต้องแล้ว</AlertDialogDescription></AlertDialogHeader><ul className="pdf-validation-list">{pdfValidationIssues.map((issue) => <li key={issue.id}><strong>{issue.label}</strong><span>{issue.message}</span></li>)}</ul><AlertDialogFooter><AlertDialogCancel>กลับไปแก้ไข</AlertDialogCancel><AlertDialogAction onClick={() => { setIsPdfValidationOpen(false); openPdfConfirm(); }}>ตั้งชื่อและดาวน์โหลดต่อ</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-        <Dialog open={isPdfConfirmOpen} onOpenChange={setIsPdfConfirmOpen}><DialogContent className="pdf-confirm-dialog"><DialogHeader><p className="page-kicker">PDF EXPORT</p><DialogTitle>ตรวจตัวอย่างก่อนดาวน์โหลด</DialogTitle><DialogDescription>ตั้งชื่อไฟล์และตรวจทานเอกสารฉบับนี้ก่อนเริ่มสร้าง PDF</DialogDescription></DialogHeader><div className="pdf-confirm-layout"><div className="pdf-confirm-paper" aria-label="ตัวอย่างเอกสารก่อนดาวน์โหลด"><DocumentPreview id="pdf-confirm-preview" document={document} accentColor={accentColor} template={template} fontFamily={fontFamily} fontSize={fontSize} /></div><div className="pdf-confirm-options"><label htmlFor="pdf-export-filename">ชื่อไฟล์ PDF<input id="pdf-export-filename" value={pdfFilename} maxLength={251} onChange={(event) => setPdfFilename(event.target.value)} placeholder={documentMeta[kind].prefix} autoFocus /></label><p>ระบบจะเติม <strong>.pdf</strong> ให้อัตโนมัติ และตัดอักขระที่ใช้กับชื่อไฟล์ไม่ได้</p><div className="pdf-filename-result"><span>ไฟล์ที่จะดาวน์โหลด</span><strong>{buildPdfFilename(pdfFilename, documentMeta[kind].prefix)}</strong></div>{isAuthenticated ? <small>หลังดาวน์โหลด ระบบจะบันทึกเวลาและชื่อไฟล์ในคลังเอกสารของคุณ</small> : <small>เข้าสู่ระบบเพื่อบันทึกประวัติการส่งออกในคลังเอกสาร</small>}</div></div><DialogFooter><button type="button" className="workspace-action" onClick={() => setIsPdfConfirmOpen(false)}>กลับไปแก้ไข</button><button type="button" className="button button-download" onClick={() => { const filename = buildPdfFilename(pdfFilename, documentMeta[kind].prefix); setIsPdfConfirmOpen(false); void exportPdf(filename); }}><FileDown size={16} /> ยืนยันและดาวน์โหลด</button></DialogFooter></DialogContent></Dialog>
+        {pdfExportStage && <div className="pdf-export-status" role="status" aria-live="polite"><div className="pdf-export-orbit" aria-hidden="true"><i /><i /><i /></div><div><strong>{pdfExportStage === "preparing" ? "กำลังเตรียมเอกสาร" : pdfExportStage === "rendering" ? "กำลังเรนเดอร์ PDF" : "กำลังเริ่มดาวน์โหลด"}</strong><span>{pdfExportStage === "preparing" ? "ตรวจสอบรูปแบบและข้อมูลเอกสาร" : pdfExportStage === "rendering" ? "กำลังจัดวางเอกสารให้พร้อมดาวน์โหลด" : "ไฟล์ PDF จะถูกบันทึกลงในอุปกรณ์ของคุณ"}</span></div></div>}
+        <AlertDialog open={isPdfValidationOpen} onOpenChange={setIsPdfValidationOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ตรวจข้อมูลสำคัญก่อนดาวน์โหลด PDF</AlertDialogTitle><AlertDialogDescription>พบข้อมูลที่ควรตรวจทานก่อนสร้าง PDF คุณสามารถกลับไปแก้ไข หรือดาวน์โหลดต่อได้หากยืนยันว่าข้อมูลถูกต้องแล้ว</AlertDialogDescription></AlertDialogHeader><ul className="pdf-validation-list">{pdfValidationIssues.map((issue) => <li key={issue.id}><strong>{issue.label}</strong><span>{issue.message}</span></li>)}</ul><AlertDialogFooter><AlertDialogCancel>กลับไปแก้ไข</AlertDialogCancel><AlertDialogAction onClick={() => { setIsPdfValidationOpen(false); openPdfConfirmation(); }}>ตรวจ preview และดาวน์โหลด</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+        <Dialog open={isPdfConfirmationOpen} onOpenChange={setIsPdfConfirmationOpen}><DialogContent className="pdf-export-confirmation"><DialogHeader><DialogTitle>ตรวจ preview และตั้งชื่อไฟล์ PDF</DialogTitle><DialogDescription>ตรวจเอกสารฉบับย่อด้านล่าง แล้วตั้งชื่อไฟล์ก่อนยืนยันดาวน์โหลด</DialogDescription></DialogHeader><label className="pdf-filename-field"><span>ชื่อไฟล์</span><input value={pdfFilename} onChange={(event) => setPdfFilename(event.target.value)} onBlur={() => setPdfFilename((current) => sanitizePdfFilename(current, document.documentNumber || documentMeta[kind].prefix))} maxLength={184} aria-label="ชื่อไฟล์ PDF" /></label><div className="pdf-confirmation-thumbnail" aria-label="ตัวอย่างเอกสารก่อนดาวน์โหลด"><DocumentPreview document={document} previewId="pdf-confirmation-preview" accentColor={accentColor} template={template} fontFamily={fontFamily} fontSize={fontSize} /></div><DialogFooter><button type="button" className="workspace-action" onClick={() => setIsPdfConfirmationOpen(false)}>กลับไปแก้ไข</button><button type="button" className="button button-download" onClick={() => void exportPdf(pdfFilename)}><Download size={16} /> ยืนยันและดาวน์โหลด</button></DialogFooter></DialogContent></Dialog>
         <Dialog open={isLogoEditorOpen} onOpenChange={setIsLogoEditorOpen}><DialogContent className="logo-editor-dialog"><DialogHeader><DialogTitle>ครอปและปรับแต่งโลโก้</DialogTitle><DialogDescription>ปรับมุมมองโลโก้ก่อนใช้ในหัวเอกสาร การเปลี่ยนแปลงจะแสดงใน preview และ PDF ทันที</DialogDescription></DialogHeader>{document.company.logoUrl && <><div className="logo-crop-preview"><img src={document.company.logoUrl} alt="ตัวอย่างการครอปโลโก้" style={{ "--logo-crop-x": `${logoCrop.x}%`, "--logo-crop-y": `${logoCrop.y}%`, "--logo-crop-zoom": String(logoCrop.zoom), "--logo-brightness": `${logoCrop.brightness}%`, "--logo-contrast": `${logoCrop.contrast}%` } as CSSProperties} /></div><div className="logo-editor-controls"><label>ซูม <input type="range" min="1" max="2.4" step="0.05" value={logoCrop.zoom} onChange={(event) => updateLogoCrop({ zoom: Number(event.target.value) })} /><output>{Math.round(logoCrop.zoom * 100)}%</output></label><label>เลื่อนซ้าย–ขวา <input type="range" min="-34" max="34" step="1" value={logoCrop.x} onChange={(event) => updateLogoCrop({ x: Number(event.target.value) })} /><output>{logoCrop.x}</output></label><label>เลื่อนขึ้น–ลง <input type="range" min="-34" max="34" step="1" value={logoCrop.y} onChange={(event) => updateLogoCrop({ y: Number(event.target.value) })} /><output>{logoCrop.y}</output></label><label>ความสว่าง <input type="range" min="70" max="130" step="1" value={logoCrop.brightness} onChange={(event) => updateLogoCrop({ brightness: Number(event.target.value) })} /><output>{logoCrop.brightness}%</output></label><label>ความคมชัด <input type="range" min="70" max="130" step="1" value={logoCrop.contrast} onChange={(event) => updateLogoCrop({ contrast: Number(event.target.value) })} /><output>{logoCrop.contrast}%</output></label></div></>}<DialogFooter><button type="button" className="workspace-action" onClick={() => updateDocument("logoCrop", { ...defaultLogoCrop })}>รีเซ็ตการปรับแต่ง</button><button type="button" className="button button-download" onClick={() => setIsLogoEditorOpen(false)}>ใช้กับเอกสาร</button></DialogFooter></DialogContent></Dialog>
         <div className="shell document-grid reference-document-grid">
           <section className="document-form-card reference-form-panel print-hide" onFocusCapture={handleFormFocus} onBlurCapture={handleFormBlur} onClickCapture={handleFormClick}>

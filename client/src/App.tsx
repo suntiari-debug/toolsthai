@@ -1,4 +1,5 @@
 import { Toaster } from "@/components/ui/sonner";
+import ReceivablesDashboard from "./pages/ReceivablesDashboard";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
@@ -7,8 +8,8 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import ComingSoon from "./pages/ComingSoon";
 import CalculatorTool from "./pages/CalculatorTool";
 import Account from "./pages/Account";
-import DocumentCenter from "./pages/DocumentCenter";
 import DocumentTool from "./pages/DocumentTool";
+import DocumentCenter from "./pages/DocumentCenter";
 import Home from "./pages/Home";
 import ToolDirectory from "./pages/ToolDirectory";
 
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/tools" component={ToolDirectory} />
       <Route path="/account" component={Account} />
       <Route path="/documents" component={DocumentCenter} />
+      <Route path="/receivables" component={ReceivablesDashboard} />
       <Route path="/quotation">{() => <DocumentTool kind="quotation" />}</Route>
       <Route path="/invoice">{() => <DocumentTool kind="invoice" />}</Route>
       <Route path="/receipt">{() => <DocumentTool kind="receipt" />}</Route>

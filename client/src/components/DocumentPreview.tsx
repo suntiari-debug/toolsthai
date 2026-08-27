@@ -6,7 +6,7 @@ import type { PreviewPan } from "@/lib/previewZoom";
 
 type DocumentPreviewProps = {
   document: BusinessDocument;
-  id?: string;
+  previewId?: string;
   accentColor?: string;
   template?: "modern" | "classic" | "minimal";
   fontFamily?: DocumentFontFamily;
@@ -18,7 +18,7 @@ type DocumentPreviewProps = {
   onStampTransformChange?: (transform: { position: StampPosition; scale: number; rotation: number }) => void;
 };
 
-export default function DocumentPreview({ document, id = "printable-document", accentColor = "#0d7a75", template = "classic", fontFamily, fontSize, screenZoom = 0, screenPan = { x: 0, y: 0 }, activeHighlight = null, isStampEditable = false, onStampTransformChange }: DocumentPreviewProps) {
+export default function DocumentPreview({ document, previewId = "printable-document", accentColor = "#0d7a75", template = "classic", fontFamily, fontSize, screenZoom = 0, screenPan = { x: 0, y: 0 }, activeHighlight = null, isStampEditable = false, onStampTransformChange }: DocumentPreviewProps) {
   const totals = calculateDocumentTotals(document);
   const meta = documentMeta[document.kind];
   const zoomClass = screenZoom === -1 ? "preview-zoom-out" : screenZoom === 1 ? "preview-zoom-in" : "preview-zoom-default";
@@ -61,7 +61,7 @@ export default function DocumentPreview({ document, id = "printable-document", a
     stampPointer.current = null;
   };
   return (
-    <article className={`document-preview ${zoomClass}${highlightClass("document")}`} id={id} data-template={template} data-font-family={resolvedFontFamily} data-font-size={resolvedFontSize} data-preview-region="document" style={{ "--document-accent": accentColor, "--preview-pan-x": `${screenPan.x}px`, "--preview-pan-y": `${screenPan.y}px` } as CSSProperties}>
+    <article className={`document-preview ${zoomClass}${highlightClass("document")}`} id={previewId} data-template={template} data-font-family={resolvedFontFamily} data-font-size={resolvedFontSize} data-preview-region="document" style={{ "--document-accent": accentColor, "--preview-pan-x": `${screenPan.x}px`, "--preview-pan-y": `${screenPan.y}px` } as CSSProperties}>
       {document.watermark && <div className="document-watermark">TOOLS THAI</div>}
       <header className={`pdf-header${highlightClass("company")}`} data-preview-region="company">
         <div className="pdf-company">

@@ -10,24 +10,6 @@ import { startLogin } from "./const";
 import "./index.css";
 
 declare global { interface Window { __RQ_STATE__?: unknown; __SSR_RENDERED__?: boolean; } }
-
-function loadAnalytics() {
-  const endpoint = import.meta.env.VITE_ANALYTICS_ENDPOINT?.trim();
-  const websiteId = import.meta.env.VITE_ANALYTICS_WEBSITE_ID?.trim();
-  if (!endpoint || !websiteId || endpoint.includes("%VITE_")) return;
-
-  try {
-    const script = document.createElement("script");
-    script.defer = true;
-    script.src = `${endpoint.replace(/\/+$/, "")}/umami`;
-    script.dataset.websiteId = websiteId;
-    document.body.appendChild(script);
-  } catch {
-    // Analytics must never block the primary application flow.
-  }
-}
-
-loadAnalytics();
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } });
 const redirectToLoginIfUnauthorized = (error: unknown) => { if (error instanceof TRPCClientError && error.message === UNAUTHED_ERR_MSG) startLogin(); };
 queryClient.getQueryCache().subscribe((event) => { if (event.type === "updated" && event.action.type === "error") { redirectToLoginIfUnauthorized(event.query.state.error); console.error("[API Query Error]", event.query.state.error); } });

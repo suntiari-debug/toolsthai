@@ -259,6 +259,129 @@
   display: none;
 }
 
+.pdf-export-confirmation {
+  width: min(94vw, 46rem);
+  max-height: min(88vh, 54rem);
+  overflow-y: auto;
+  background: #fffdf8;
+}
+
+.pdf-filename-field {
+  display: grid;
+  gap: .42rem;
+  color: #244e4a;
+  font-size: .84rem;
+  font-weight: 700;
+}
+
+.pdf-filename-field input {
+  min-height: 2.7rem;
+  padding: 0 .8rem;
+  border: 1px solid #bfd4ca;
+  border-radius: .62rem;
+  outline: none;
+  color: #183b38;
+  background: #fff;
+  font: inherit;
+  font-weight: 500;
+}
+
+.pdf-filename-field input:focus {
+  border-color: #0d7a75;
+  box-shadow: 0 0 0 3px rgba(13, 122, 117, .14);
+}
+
+.pdf-confirmation-thumbnail {
+  position: relative;
+  min-height: 17rem;
+  overflow: hidden;
+  border: 1px solid #d7d0c4;
+  border-radius: .8rem;
+  background: #e6e1d9;
+}
+
+.pdf-confirmation-thumbnail::after {
+  position: absolute;
+  inset: auto .65rem .65rem auto;
+  z-index: 2;
+  padding: .3rem .5rem;
+  border: 1px solid rgba(21, 56, 54, .16);
+  border-radius: 999px;
+  color: #31534f;
+  background: rgba(255, 253, 248, .92);
+  content: "ตัวอย่างก่อนดาวน์โหลด";
+  font-size: .68rem;
+  font-weight: 700;
+}
+
+.pdf-confirmation-thumbnail .document-preview {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0;
+  transform: scale(.34);
+  transform-origin: top left;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.pdf-export-status {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+  padding: 1.35rem;
+  color: #fffaf0;
+  background: rgba(11, 48, 46, .92);
+  backdrop-filter: blur(7px);
+}
+
+.pdf-export-status > div:last-child { display: grid; gap: .22rem; max-width: 19rem; }
+.pdf-export-status strong { font-size: 1.08rem; }
+.pdf-export-status span { color: #d6e9df; font-size: .87rem; line-height: 1.45; }
+
+.pdf-export-orbit {
+  position: relative;
+  display: grid;
+  width: 4.1rem;
+  height: 4.1rem;
+  flex: 0 0 4.1rem;
+  place-items: center;
+  border: 1px solid rgba(227, 242, 234, .24);
+  border-radius: 50%;
+}
+
+.pdf-export-orbit i {
+  position: absolute;
+  width: .54rem;
+  height: .54rem;
+  border-radius: 50%;
+  background: #e7a281;
+  animation: pdf-export-orbit 1.22s cubic-bezier(.77, 0, .175, 1) infinite;
+}
+
+.pdf-export-orbit i:nth-child(1) { transform: translateX(1.25rem); }
+.pdf-export-orbit i:nth-child(2) { transform: rotate(120deg) translateX(1.25rem); animation-delay: -.4s; }
+.pdf-export-orbit i:nth-child(3) { transform: rotate(240deg) translateX(1.25rem); animation-delay: -.8s; }
+
+@keyframes pdf-export-orbit {
+  0%, 100% { opacity: .34; scale: .72; }
+  50% { opacity: 1; scale: 1.2; }
+}
+
+@media (max-width: 640px) {
+  .pdf-export-confirmation { width: calc(100vw - 1rem); max-height: 93vh; padding: 1rem; }
+  .pdf-confirmation-thumbnail { min-height: 12.8rem; }
+  .pdf-confirmation-thumbnail .document-preview { transform: scale(.255); }
+  .pdf-export-status { align-items: flex-start; padding-top: 30vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pdf-export-orbit i { animation: none; opacity: .88; }
+}
+
 .document-tool-page .pdf-stamp-wrapper.is-editable .pdf-stamp-image {
   filter: drop-shadow(0 0 0.16rem rgba(13, 122, 117, .34));
 }
@@ -388,22 +511,6 @@
 .pdf-validation-list span { color: #8a5a3c; }
 
 .logo-editor-dialog { max-width: min(34rem, calc(100vw - 2rem)); }
-.pdf-confirm-dialog { width: min(100%, 60rem); max-width: calc(100vw - 2rem); background: #fffdf9 !important; }
-.pdf-confirm-dialog [data-slot="dialog-header"] { gap: .35rem; }
-.pdf-confirm-dialog .page-kicker { margin: 0; color: #0d6e72; font-family: "DM Mono", monospace; font-size: .64rem; font-weight: 800; letter-spacing: .12em; }
-.pdf-confirm-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(15rem, .6fr); gap: 1rem; align-items: start; }
-.pdf-confirm-paper { max-height: min(58vh, 35rem); overflow: auto; padding: .8rem; border: 1px solid #d3e1db; border-radius: .85rem; background-color: #edf4f1; background-image: linear-gradient(rgba(13, 110, 114, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(13, 110, 114, .035) 1px, transparent 1px); background-size: 1.1rem 1.1rem; }
-.pdf-confirm-paper .document-preview { width: 208%; min-width: 0; zoom: .48; transform: none !important; margin: 0 !important; box-shadow: 0 .8rem 1.8rem rgba(19, 45, 43, .18); }
-.pdf-confirm-options { display: grid; gap: .8rem; padding: .9rem; border: 1px solid #dce7e2; border-radius: .85rem; background: #fbfdfc; }
-.pdf-confirm-options label { display: grid; gap: .38rem; color: #3e514d; font-size: .77rem; font-weight: 750; }
-.pdf-confirm-options input { min-height: 2.4rem; padding: .5rem .62rem; border: 1px solid #b9d2c8; border-radius: .5rem; outline: 0; color: #243b37; background: #fff; font: inherit; font-size: .85rem; }
-.pdf-confirm-options input:focus { border-color: #0d7a75; box-shadow: 0 0 0 3px rgba(13, 122, 117, .12); }
-.pdf-confirm-options > p, .pdf-confirm-options > small { margin: 0; color: #70817c; font-size: .7rem; line-height: 1.55; }
-.pdf-confirm-options > small { padding-top: .72rem; border-top: 1px solid #e0eae5; }
-.pdf-filename-result { display: grid; gap: .25rem; padding: .7rem; border-radius: .56rem; background: #edf7f3; }
-.pdf-filename-result span { color: #5d766e; font-size: .62rem; font-weight: 700; }
-.pdf-filename-result strong { overflow: hidden; color: #075e62; font-family: "DM Mono", monospace; font-size: .71rem; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 720px) { .pdf-confirm-dialog { max-height: calc(100dvh - 1rem); overflow-y: auto; }.pdf-confirm-layout { grid-template-columns: 1fr; }.pdf-confirm-paper { max-height: 12.5rem; }.pdf-confirm-paper .document-preview { width: 294%; zoom: .34; }.pdf-confirm-dialog [data-slot="dialog-footer"] { position: sticky; bottom: -.1rem; z-index: 1; padding-top: .7rem; background: #fffdf9; } }
 .logo-crop-preview { display: grid; width: min(100%, 18rem); height: 10rem; place-items: center; overflow: hidden; justify-self: center; border: 1px solid #dbe5e0; border-radius: .75rem; background: repeating-conic-gradient(#f4f7f5 0 25%, #fff 0 50%) 50% / 1.1rem 1.1rem; }
 .logo-crop-preview img { width: 74%; height: 74%; object-fit: contain; filter: brightness(var(--logo-brightness)) contrast(var(--logo-contrast)); transform: translate(var(--logo-crop-x), var(--logo-crop-y)) scale(var(--logo-crop-zoom)); transform-origin: center; }
 .logo-editor-controls { display: grid; gap: .65rem; }

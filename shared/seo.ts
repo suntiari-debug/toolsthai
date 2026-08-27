@@ -30,21 +30,7 @@ export type HomeSeoProfile = {
 };
 
 export const SITE_NAME = "Tools Thai";
-// Used only when a caller has no request/browser origin (for example, local tests).
-export const DEFAULT_CANONICAL_ORIGIN = "http://localhost:3000";
-// Backward-compatible alias used by existing client tests and consumers.
-export const CANONICAL_ORIGIN = DEFAULT_CANONICAL_ORIGIN;
-
-export function getCanonicalOrigin(origin?: string) {
-  const candidate = origin?.trim() || (typeof window !== "undefined" ? window.location.origin : DEFAULT_CANONICAL_ORIGIN);
-  try {
-    const parsed = new URL(candidate);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("Unsupported canonical origin protocol");
-    return parsed.origin;
-  } catch {
-    return DEFAULT_CANONICAL_ORIGIN;
-  }
-}
+export const CANONICAL_ORIGIN = "https://toolsthai-gzgjhprz.manus.space";
 
 export const homeSeo: HomeSeoProfile = {
   path: "/",
@@ -52,12 +38,6 @@ export const homeSeo: HomeSeoProfile = {
   description: "สร้างใบเสนอราคา ใบแจ้งหนี้ ใบเสร็จรับเงิน ใบกำกับภาษี และใบส่งของออนไลน์ฟรี พร้อมดาวน์โหลด PDF ภาษาไทย และเครื่องคำนวณธุรกิจสำหรับ SME ไทย",
   h1: "เครื่องมือเอกสารธุรกิจออนไลน์ฟรี สำหรับ SME ไทย",
   intro: "ออกใบเสนอราคา ใบแจ้งหนี้ ใบเสร็จรับเงิน และคำนวณต้นทุนได้จากที่เดียว พร้อม PDF ภาษาไทย ไม่ต้องสมัคร",
-};
-
-export const documentCenterSeo = {
-  path: "/documents",
-  title: "ศูนย์เอกสารธุรกิจของฉัน | Tools Thai",
-  description: "จัดการ ค้นหา และติดตามสถานะเอกสารธุรกิจที่บันทึกไว้ในบัญชี Tools Thai",
 };
 
 export const documentSeo: Record<DocumentSeoKind, DocumentSeoProfile> = {
@@ -107,29 +87,25 @@ export const documentSeo: Record<DocumentSeoKind, DocumentSeoProfile> = {
   },
 };
 
-function structuredData(kind: DocumentSeoKind, canonicalOrigin: string): unknown[] {
+function structuredData(kind: DocumentSeoKind): unknown[] {
   const page = documentSeo[kind];
   return [
     { "@context": "https://schema.org", "@type": "WebApplication", name: page.h1, applicationCategory: "BusinessApplication", operatingSystem: "Web", isAccessibleForFree: true, description: page.description, offers: { "@type": "Offer", price: "0", priceCurrency: "THB" } },
-    { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: "Tools Thai", item: canonicalOrigin }, { "@type": "ListItem", position: 2, name: "เครื่องมือทั้งหมด", item: `${canonicalOrigin}/tools` }, { "@type": "ListItem", position: 3, name: page.h1, item: `${canonicalOrigin}${page.path}` }] },
+    { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: "Tools Thai", item: CANONICAL_ORIGIN }, { "@type": "ListItem", position: 2, name: "เครื่องมือทั้งหมด", item: `${CANONICAL_ORIGIN}/tools` }, { "@type": "ListItem", position: 3, name: page.h1, item: `${CANONICAL_ORIGIN}${page.path}` }] },
     { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: page.faqs.map((faq) => ({ "@type": "Question", name: faq.question, acceptedAnswer: { "@type": "Answer", text: faq.answer } })) },
   ];
 }
 
-function homeStructuredData(canonicalOrigin: string): unknown[] {
-  return [{ "@context": "https://schema.org", "@type": "WebSite", name: SITE_NAME, url: canonicalOrigin, inLanguage: "th-TH" }];
+function homeStructuredData(): unknown[] {
+  return [{ "@context": "https://schema.org", "@type": "WebSite", name: SITE_NAME, url: CANONICAL_ORIGIN, inLanguage: "th-TH" }];
 }
 
 export function getDocumentSeo(kind: string) { return kind === "quotation" || kind === "invoice" ? documentSeo[kind] : undefined; }
-export function getDocumentStructuredData(kind: string, origin?: string) {
-  return kind === "quotation" || kind === "invoice" ? structuredData(kind, getCanonicalOrigin(origin)) : undefined;
-}
-export function getSeoHead(path: string, origin?: string): SsrHead {
-  const canonicalOrigin = getCanonicalOrigin(origin);
-  if (path === homeSeo.path) return { title: homeSeo.title, description: homeSeo.description, canonicalPath: homeSeo.path, jsonLd: homeStructuredData(canonicalOrigin) };
-  if (path === documentCenterSeo.path) return { title: documentCenterSeo.title, description: documentCenterSeo.description, canonicalPath: documentCenterSeo.path, jsonLd: [] };
+export function getDocumentStructuredData(kind: string) { return kind === "quotation" || kind === "invoice" ? structuredData(kind) : undefined; }
+export function getSeoHead(path: string): SsrHead {
+  if (path === homeSeo.path) return { title: homeSeo.title, description: homeSeo.description, canonicalPath: homeSeo.path, jsonLd: homeStructuredData() };
   const kind = path.replace(/^\//, "") as DocumentSeoKind;
   const page = getDocumentSeo(kind);
   if (!page) throw new Error(`Unsupported SEO SSR route: ${path}`);
-  return { title: page.title, description: page.description, canonicalPath: page.path, jsonLd: structuredData(kind, canonicalOrigin) };
+  return { title: page.title, description: page.description, canonicalPath: page.path, jsonLd: structuredData(kind) };
 }

@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { ArrowUpRight, Calculator, FileCheck2, FileText, ReceiptText, Truck, WalletCards } from "lucide-react";
+import { ArrowUpRight, Calculator, CircleDollarSign, FileCheck2, FileText, ReceiptText, Truck, WalletCards } from "lucide-react";
 import PublicHeader from "@/components/PublicHeader";
 import PublicFooter from "@/components/PublicFooter";
 
@@ -11,6 +11,7 @@ const tools = [
   { href: "/delivery-note", icon: Truck, title: "ใบส่งของ", copy: "ทำใบส่งของและเอกสารแนบสำหรับการจัดส่งสินค้า", group: "เอกสารธุรกิจ" },
   { href: "/pricing-calculator", icon: Calculator, title: "คำนวณต้นทุนและราคาขาย", copy: "คำนวณราคาขายจากต้นทุน Margin Markup และ VAT", group: "เครื่องคำนวณธุรกิจ" },
   { href: "/vat-calculator", icon: WalletCards, title: "คำนวณ VAT", copy: "แยก VAT หรือรวม VAT จากยอดขายได้ในไม่กี่วินาที", group: "เครื่องคำนวณธุรกิจ" },
+  { href: "/receivables", icon: CircleDollarSign, title: "ติดตามรับชำระ", copy: "ติดตามลูกหนี้ บันทึกการชำระบางส่วน และดูยอดคงเหลือ", group: "การเงินธุรกิจ" },
 ];
 
 export default function ToolDirectory() {

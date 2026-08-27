@@ -1,52 +1,40 @@
 # Project TODO
 
-- [x] เปรียบเทียบ WebDev full-stack scaffold กับ Repository Tools Thai และระบุไฟล์ที่ต้องย้าย
-- [x] ย้าย React/Vite client routes, components, styles และ document/PDF utilities จาก Tools Thai
-- [x] ย้าย Express/tRPC routers, database helpers, Drizzle schema และ migrations จาก Tools Thai
-- [x] ผสาน Manus OAuth, user profile, company profile, saved document history และ storage upload flows กับ WebDev scaffold
-- [x] คงหน้าเครื่องมือภาษาไทยสำหรับใบเสนอราคา ใบแจ้งหนี้ ใบเสร็จรับเงิน ใบส่งของ และใบกำกับภาษี
-- [x] คง PDF export และเครื่องคำนวณราคา VAT กำไรขั้นต้น และเงื่อนไขการชำระเงิน
-- [x] ยกระดับระบบนำทางและ visual hierarchy ให้ดูหรู เรียบร้อย และใช้งานได้ทั้งเดสก์ท็อปกับมือถือ
-- [x] ใช้ SEO dynamic สำหรับ canonical, Open Graph, JSON-LD, robots.txt และ sitemap.xml จาก PUBLIC_SITE_URL
-- [x] จัดทำ WEBDEV_ENV_SETUP.md และ variable template สำหรับ environment, database migration และ OAuth callback โดยใช้ WebDev Secrets แทนไฟล์ .env
-- [x] เพิ่มหรือปรับ Vitest สำหรับ SEO/runtime behavior ที่ย้ายเข้ามา
-- [x] ตรวจ pnpm check, pnpm test, pnpm build และ production runtime routes
-- [x] ตรวจ visual preview บน desktop และ mobile
-- [x] บันทึก checkpoint เมื่อทุกงานเสร็จและสรุปขั้นตอนก่อน Publish
-- [x] แก้ migration company profile ที่เพิ่ม defaultDocumentTemplate ซ้ำก่อน apply database schema
-- [x] ออกแบบสถานะเอกสารและ filter model สำหรับศูนย์เอกสาร
-- [x] เพิ่ม status และ archivedAt ใน saved_documents schema พร้อม migration ที่ปลอดภัย
-- [x] เพิ่ม tRPC สำหรับค้นหา กรอง เปลี่ยนสถานะ ทำสำเนา และเก็บถาวรเอกสาร
-- [x] สร้างหน้า Document Center ที่ responsive พร้อม search, filters, table/list และ actions
-- [x] เชื่อมการเปิดเอกสารจาก Document Center กลับเข้า document editor และรองรับ duplicate
-- [x] เพิ่ม Vitest สำหรับ document center workflow และตรวจ TypeScript, build, runtime, desktop/mobile preview
-- [x] บันทึก checkpoint และสรุปผล Module 1
-- [x] เพิ่ม workflow tests สำหรับ filter, status, archive, duplicate และ ownership guard ของ Document Center
-- [x] ยืนยัน flow เปิดเอกสารจาก /documents ไปยัง editor และการใช้งานสำเนาต่อผ่าน sessionStorage
-- [x] เพิ่ม integration-style test ว่า resume payload จาก Document Center restore เข้า editor ได้จริง
-- [x] เพิ่ม integration-style test ว่า duplicate document สร้างหมายเลขใหม่และ payload เดิมยัง restore ได้
-- [x] รวม sessionStorage resume flow เป็น helper ที่ DocumentCenter, Account และ DocumentTool ใช้จริง พร้อมทดสอบ storage-to-editor integration
-- [x] รวม duplicate payload builder เป็น logic ที่ database helper ใช้จริง พร้อมทดสอบ source-to-copy-to-editor integration
-- [x] เพิ่ม server integration test ของ duplicateSavedDocument โดย mock database select/insert และตรวจ record สำเนา
-- [x] ตรวจต้นเหตุ hydration mismatch ของหน้า /quotation ระหว่าง SSR และ client
-- [x] แก้ client-only หรือ non-deterministic render ในหน้าใบเสนอราคาและเพิ่ม regression coverage
-- [x] ตรวจ TypeScript, SSR, runtime และ Browser console หลังแก้ hydration mismatch
-- [x] บันทึก checkpoint และสรุปการแก้ hydration mismatch
-- [x] ตรวจ workflow PDF export และจุดแสดงสถานะปัจจุบัน
-- [x] เพิ่ม loading overlay แบบ animated พร้อมข้อความความคืบหน้าระหว่างสร้าง PDF
-- [x] เพิ่ม Vitest สำหรับ state/ข้อความ loading ของ PDF export และตรวจ TypeScript, build, visual preview
-- [x] รวม PDF export lifecycle ที่ DocumentTool ใช้จริงและทดสอบการเปลี่ยนสถานะ/ปิด overlay เมื่อสำเร็จหรือผิดพลาด
-- [x] ยืนยัน browser-level loading overlay ของ PDF export ผ่านการจำลอง workflow ที่ไม่สร้างไฟล์ผู้ใช้จริง (production runtime แสดง "กำลังเตรียมเอกสาร", ดาวน์โหลด QT-202608-001.pdf และ overlay ปิดหลังเริ่มดาวน์โหลด)
-- [x] เพิ่ม browser verification ของ PDF overlay ใน repository และผูกคำสั่ง test:pdf-overlay เพื่อรันซ้ำได้ (กำหนด TOOLSTHAI_BROWSER_BASE_URL)
-- [x] บันทึก checkpoint และสรุป PDF loading experience
-- [x] วิเคราะห์ contract ปัจจุบันของ PDF export, saved document และ Document Center สำหรับออกแบบ export history
-- [x] เพิ่ม schema, migration และ tRPC API แบบ owner-scoped สำหรับประวัติการส่งออก PDF
-- [x] เพิ่มหน้าต่างตั้งชื่อไฟล์และ PDF preview ก่อนยืนยันดาวน์โหลด
-- [x] บันทึกและแสดงประวัติการส่งออกใน Document Center พร้อมทดสอบ ownership และ UI workflow
-- [x] ตรวจ TypeScript, Vitest, production build และ browser flow ของ PDF preview/export history (66 tests ผ่าน, browser ดาวน์โหลดชื่อไฟล์ไทยที่กำหนด และ mobile dialog อยู่ใน viewport)
-- [x] เพิ่ม test สำหรับ export history summary/owner scope และตรวจ dialog ของ Document Center เมื่อมีหรือไม่มีประวัติ
-- [x] เพิ่ม test สำหรับ export history summary/owner scope และตรวจ dialog ของ Document Center เมื่อมีหรือไม่มีประวัติ
-- [x] ยืนยัน UI workflow ของ Document Center export history จาก browser fixture ก่อน checkpoint (แสดง PDF 2 และ dialog มี filename/timestamp ครบ)
-- [x] เพิ่ม unit test aggregation ของ exportCount และ lastExportedAt ใน document history summary
-- [x] เพิ่ม assertion timestamp และ empty-state ให้ browser fixture ของ Document Center export history
-- [x] บันทึก checkpoint และสรุป PDF export workflow ที่ขยายแล้ว
+- [x] กู้ source Tools Thai จาก repository เข้าสู่ workspace WebDev ใหม่ และตรวจ dependencies/runtime
+- [x] ตรวจความแตกต่างจาก checkpoint ที่เผยแพร่ล่าสุด และระบุว่าส่วน Module 1/PDF workflow ที่เคยเผยแพร่ไม่ได้อยู่ใน commit e92319c
+- [x] ออกแบบ model ยอดคงค้าง รายการรับชำระบางส่วน และสถานะเอกสารสำหรับ Module 2
+- [x] เพิ่ม schema, migration และ tRPC API owner-scoped สำหรับการรับชำระและ activity timeline
+- [x] เพิ่มการบันทึก/แก้ไข/ยกเลิกรายการรับชำระบางส่วนแบบ audit-safe พร้อมคำนวณยอดคงเหลือและสถานะอัตโนมัติ
+- [x] เพิ่มแปลงใบเสนอราคาเป็นใบแจ้งหนี้โดยรักษาข้อมูลลูกค้าและรายการสินค้า
+- [x] เพิ่ม dashboard ยอดรอรับ ยอดเกินกำหนด ยอดรับชำระ และตัวกรองช่วงเวลา
+- [x] เชื่อมประวัติการรับชำระกับ Document Center พร้อมรายละเอียด timeline
+- [x] เพิ่ม Vitest, ตรวจ TypeScript, production build, browser flows และ responsive preview
+- [x] บันทึก checkpoint และสรุป Module 2 baseline ก่อนต่อยอด payment audit
+- [x] ตรวจ migration 0005_amusing_lily_hollister.sql, schema และสถานะฐานข้อมูลก่อน apply
+- [x] ตรวจ owner-scoped API สำหรับ receivables และ partial payments ก่อนเผยแพร่
+- [x] รัน TypeScript, tests, production build และ browser QA สำหรับ dashboard/partial payment
+- [x] สร้าง Module 1 และ PDF workflow ที่มีฟีเจอร์เทียบเท่า checkpoint 014c73f1 ใหม่บน source Module 2 ก่อนสร้าง checkpoint เพื่อไม่ให้เกิด regression
+- [x] เพิ่ม schema และ API owner-scoped สำหรับ activity timeline ของ receivables/payment events
+- [x] แสดง activity timeline ใน dashboard ลูกหนี้ พร้อม unit tests และ browser QA
+- [x] เพิ่ม regression test การแปลงใบเสนอราคาเป็นใบแจ้งหนี้โดยคงข้อมูลลูกค้าและรายการสินค้า
+- [x] เพิ่มตัวกรองช่วงเวลาใน Receivables Dashboard พร้อม browser QA
+- [x] เพิ่ม unit tests สำหรับการสร้างและอ่าน activity timeline แบบ owner-scoped
+- [x] เพิ่ม integration-style test การอ่าน activity timeline ผ่าน receivables.get โดยยืนยัน userId และลำดับเหตุการณ์
+- [x] ยืนยันว่าไม่พบ source/export ที่กู้ Module 1/PDF workflow เวอร์ชัน checkpoint 014c73f1 ได้ และบันทึกเหตุผลประกอบการเลือก rebuild
+- [x] ตรวจ Git history: commit e92319c สืบทอด PDF/document base จาก bb1d3bc แต่ไม่พบ Document Center และ PDF workflow รุ่น checkpoint 014c73f1 ใน Git history
+- [x] เลือก rebuild Module 1/PDF บนฐาน Module 2 แทนการกู้ source ที่ไม่พบ และตรวจ feature parity ที่กำหนดไว้
+- [x] รวมและตรวจ regression ของ Module 1/PDF กับ Module 2 ก่อน checkpoint เผยแพร่
+- [x] จัดทำเอกสารส่งต่อสถานะ Tools Thai สำหรับทีมงาน พร้อมสรุป recovery risk และหลักฐาน QA ล่าสุด
+- [x] วิเคราะห์ contract ของ saved documents, editor และ Module 2 ก่อนสร้าง Module 1 ใหม่
+- [x] เพิ่ม migration/API owner-scoped สำหรับสถานะ, archive และประวัติ PDF export ของ Document Center
+- [x] สร้าง Document Center สำหรับค้นหา กรอง เปลี่ยนสถานะ ทำสำเนา เก็บถาวร และกลับไปแก้ไขเอกสาร
+- [x] เพิ่ม PDF loading status, ตั้งชื่อไฟล์, preview ก่อนดาวน์โหลด และ export history
+- [x] รวม Document Center/PDF workflow กับ Module 2 พร้อม regression tests, build และ browser QA
+- [x] บันทึก checkpoint และสรุป Module 1 ที่สร้างใหม่พร้อม Module 2
+- [x] Reconcile Drizzle migration metadata ของ 0005–0007 หลังตรวจ hash/timestamp และสร้าง indexes ของ Document Center ที่ขาด
+- [x] เพิ่ม error feedback และ retry state สำหรับ list, status, archive, duplicate และ PDF export history ใน Document Center
+- [x] เพิ่มทางเข้าคลังเอกสารสำหรับผู้ใช้ที่เข้าสู่ระบบในเมนูหลัก และแสดงจำนวน/เวลาส่งออก PDF ล่าสุดในแต่ละรายการ
+- [x] เพิ่ม payment void/replacement ที่เก็บ audit trail, คำนวณยอดคงเหลือใหม่ และไม่ลบรายการรับชำระเดิม
+- [x] แสดงสถานะรับชำระและ timeline ของใบแจ้งหนี้แบบ owner-scoped ใน Document Center
+- [x] ตรวจ schema/API/tests/browser QA สำหรับ audit-safe payment management และ Document Center receivable linkage
+- [x] บันทึก checkpoint สุดท้ายหลังปิดรายการ Module 1+2 ที่ค้าง

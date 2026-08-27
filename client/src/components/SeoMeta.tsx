@@ -1,7 +1,5 @@
 import { useEffect } from "react";
 
-import { getClientCanonicalOrigin } from "@/lib/seoOrigin";
-
 type SeoMetaProps = { title: string; description: string; canonicalPath?: string; structuredData?: unknown[] };
 
 function setTag(selector: string, attribute: "name" | "property", key: string, value: string) {
@@ -19,7 +17,7 @@ export default function SeoMeta({ title, description, canonicalPath, structuredD
     setTag('meta[name="twitter:title"]', "name", "twitter:title", title);
     setTag('meta[name="twitter:description"]', "name", "twitter:description", description);
     if (canonicalPath) {
-      const canonicalUrl = new URL(canonicalPath, getClientCanonicalOrigin() || window.location.origin).toString();
+      const canonicalUrl = new URL(canonicalPath, window.location.origin).toString();
       let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
       if (!canonical) { canonical = document.createElement("link"); canonical.rel = "canonical"; document.head.appendChild(canonical); }
       canonical.href = canonicalUrl;

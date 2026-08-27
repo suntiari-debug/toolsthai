@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <!-- The server generates absolute URLs from PUBLIC_SITE_URL. -->
+  <url><loc>https://toolsthai-gzgjhprz.manus.space/</loc></url>
+  <url><loc>https://toolsthai-gzgjhprz.manus.space/tools</loc></url>
+  <url><loc>https://toolsthai-gzgjhprz.manus.space/quotation</loc></url>
+  <url><loc>https://toolsthai-gzgjhprz.manus.space/invoice</loc></url>
+  <url><loc>https://toolsthai-gzgjhprz.manus.space/receipt</loc></url>
+  <url><loc>https://toolsthai-gzgjhprz.manus.space/tax-invoice</loc></url>
+  <url><loc>https://toolsthai-gzgjhprz.manus.space/delivery-note</loc></url>
+  <url><loc>https://toolsthai-gzgjhprz.manus.space/pricing-calculator</loc></url>
+  <url><loc>https://toolsthai-gzgjhprz.manus.space/vat-calculator</loc></url>
+  <url><loc>https://toolsthai-gzgjhprz.manus.space/margin-calculator</loc></url>
+  <url><loc>https://toolsthai-gzgjhprz.manus.space/payment-terms</loc></url>
 </urlset>
