@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { decimal, index, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -44,5 +44,42 @@ export const savedDocuments = mysqlTable("saved_documents", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const receivables = mysqlTable("receivables", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  invoiceId: int("invoiceId").notNull().unique().references(() => savedDocuments.id, { onDelete: "cascade" }),
+  documentNumber: varchar("documentNumber", { length: 64 }).notNull(),
+  customerName: varchar("customerName", { length: 255 }).notNull(),
+  customerAddress: text("customerAddress"),
+  issueDate: timestamp("issueDate").notNull(),
+  dueDate: timestamp("dueDate").notNull(),
+  totalAmount: decimal("totalAmount", { precision: 14, scale: 2 }).notNull(),
+  paidAmount: decimal("paidAmount", { precision: 14, scale: 2 }).notNull().default("0.00"),
+  status: mysqlEnum("status", ["open", "partial", "paid", "overdue", "cancelled"]).notNull().default("open"),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  userStatusIdx: index("receivables_user_status_idx").on(table.userId, table.status),
+  dueDateIdx: index("receivables_due_date_idx").on(table.userId, table.dueDate),
+}));
+
+export const payments = mysqlTable("payments", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  receivableId: int("receivableId").notNull().references(() => receivables.id, { onDelete: "cascade" }),
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  paidAt: timestamp("paidAt").notNull(),
+  method: mysqlEnum("method", ["cash", "transfer", "card", "cheque", "other"]).notNull().default("transfer"),
+  reference: varchar("reference", { length: 128 }),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  userPaidAtIdx: index("payments_user_paid_at_idx").on(table.userId, table.paidAt),
+  receivableIdx: index("payments_receivable_idx").on(table.receivableId),
+}));
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+export type Receivable = typeof receivables.$inferSelect;
+export type Payment = typeof payments.$inferSelect;

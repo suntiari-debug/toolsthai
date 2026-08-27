@@ -5,6 +5,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import { storagePut } from "./storage";
+import { receivablesRouter } from "./routers/receivables";
 
 const documentKind = z.enum(["quotation", "invoice", "receipt", "delivery-note", "tax-invoice"]);
 const companyProfileInput = z.object({
@@ -71,6 +72,7 @@ export const appRouter = router({
       return db.saveCompanyProfile({ userId: ctx.user.id, name: input.name, address: input.address || null, taxId: input.taxId || null, phone: input.phone || null, email: input.email || null, logoUrl, signatureUrl, stampUrl, signerName: input.signerName || null, signerPosition: input.signerPosition || null, defaultDocumentTemplate: input.defaultDocumentTemplate || null, defaultAccentColor: input.defaultAccentColor || null, defaultFontFamily: input.defaultFontFamily || null, defaultFontSize: input.defaultFontSize || null });
     }),
   }),
+  receivables: receivablesRouter,
   documents: router({
     list: protectedProcedure.query(({ ctx }) => db.listSavedDocuments(ctx.user.id)),
     save: protectedProcedure.input(z.object({ kind: documentKind, documentNumber: z.string().trim().min(1).max(64), customerName: z.string().trim().max(255).optional(), payload: z.string().min(2).max(60_000) })).mutation(async ({ ctx, input }) => {
