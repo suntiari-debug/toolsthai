@@ -99,4 +99,11 @@ describe("receivables router access", () => {
     await expect(appRouter.createCaller(ctx).receivables.getByInvoice({ invoiceId: 8 })).resolves.toMatchObject({ id: 19, invoiceId: 8 });
     expect(getReceivableByInvoice).toHaveBeenCalledWith(321, 8);
   });
+
+  it("creates the aging report only with the authenticated owner and validated report period", async () => {
+    const getReceivableAgingReport = vi.spyOn(db, "getReceivableAgingReport").mockResolvedValue({ asOf: new Date("2026-08-31T00:00:00.000Z"), month: "2026-08", buckets: [], items: [], summary: { outstanding: "0.00", invoiceCount: 0, collectedThisMonth: "0.00", paymentCount: 0, collectedByMethod: {} } } as never);
+    const ctx = { user: { id: 321, openId: "owner-321", name: "Owner", email: "owner@example.com", loginMethod: "test", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] } as TrpcContext;
+    await expect(appRouter.createCaller(ctx).receivables.agingReport({ asOf: "2026-08-31", month: "2026-08" })).resolves.toMatchObject({ month: "2026-08" });
+    expect(getReceivableAgingReport).toHaveBeenCalledWith(321, { asOf: new Date("2026-08-31T00:00:00.000Z"), month: "2026-08" });
+  });
 });

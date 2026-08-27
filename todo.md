@@ -38,3 +38,8 @@
 - [x] แสดงสถานะรับชำระและ timeline ของใบแจ้งหนี้แบบ owner-scoped ใน Document Center
 - [x] ตรวจ schema/API/tests/browser QA สำหรับ audit-safe payment management และ Document Center receivable linkage
 - [x] บันทึก checkpoint สุดท้ายหลังปิดรายการ Module 1+2 ที่ค้าง
+- [x] กำหนด aging buckets และเดือนอ้างอิงสำหรับรายงานลูกหนี้คงค้าง
+- [x] เพิ่ม API owner-scoped สำหรับรายงานอายุลูกหนี้และยอดรับชำระรายเดือน
+- [x] สร้างหน้ารายงานพร้อมตัวกรองวันอ้างอิง/เดือนและ export CSV ภาษาไทย
+- [x] เพิ่ม unit/browser QA สำหรับการคำนวณรายงานและไฟล์ CSV
+- [ ] บันทึก checkpoint รายงานอายุลูกหนี้และ CSV หลังตรวจครบ

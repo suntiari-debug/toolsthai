@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 import { companyProfiles, documentExports, InsertUser, payments, receivableEvents, receivables, savedDocuments, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { buildReceivableActivityEvent, calculateInvoiceTotal, deriveReceivableStatus, parseDateOnly, parseInvoicePayload, validatePaymentAmount } from "./receivables";
+import { buildReceivableAgingReport, getMonthBounds } from "./agingReport";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -176,6 +177,15 @@ export async function getReceivableByInvoice(userId: number, invoiceId: number) 
   if (!db) return undefined;
   const result = await db.select({ id: receivables.id }).from(receivables).where(and(eq(receivables.userId, userId), eq(receivables.invoiceId, invoiceId))).limit(1);
   return result[0] ? getReceivableDetails(userId, result[0].id) : undefined;
+}
+
+export async function getReceivableAgingReport(userId: number, input: { asOf: Date; month: string }) {
+  const db = await getDb();
+  if (!db) return buildReceivableAgingReport({ rows: [], payments: [], asOf: input.asOf, month: input.month });
+  const rows = await db.select({ id: receivables.id, invoiceId: receivables.invoiceId, documentNumber: receivables.documentNumber, customerName: receivables.customerName, issueDate: receivables.issueDate, dueDate: receivables.dueDate, totalAmount: receivables.totalAmount, paidAmount: receivables.paidAmount, status: receivables.status }).from(receivables).where(eq(receivables.userId, userId)).orderBy(desc(receivables.dueDate));
+  const bounds = getMonthBounds(input.month);
+  const monthlyPayments = await db.select({ amount: payments.amount, method: payments.method }).from(payments).where(and(eq(payments.userId, userId), isNull(payments.voidedAt), gte(payments.paidAt, bounds.start), lt(payments.paidAt, bounds.end)));
+  return buildReceivableAgingReport({ rows, payments: monthlyPayments, asOf: input.asOf, month: input.month });
 }
 
 export async function createReceivableFromInvoice(userId: number, invoiceId: number) {

@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import ReceivablesDashboard from "./pages/ReceivablesDashboard";
+import ReceivablesAgingReport from "./pages/ReceivablesAgingReport";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/account" component={Account} />
       <Route path="/documents" component={DocumentCenter} />
       <Route path="/receivables" component={ReceivablesDashboard} />
+      <Route path="/receivables/report" component={ReceivablesAgingReport} />
       <Route path="/quotation">{() => <DocumentTool kind="quotation" />}</Route>
       <Route path="/invoice">{() => <DocumentTool kind="invoice" />}</Route>
       <Route path="/receipt">{() => <DocumentTool kind="receipt" />}</Route>

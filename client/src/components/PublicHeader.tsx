@@ -20,6 +20,7 @@ export default function PublicHeader() {
           <a href="/#how-it-works" onClick={closeMenu}>วิธีใช้งาน</a>
           <a href="/#why-tools-thai" onClick={closeMenu}>ทำไมต้อง Tools Thai</a>
           {isAuthenticated && <Link href="/documents" onClick={closeMenu}>คลังเอกสาร</Link>}
+          {isAuthenticated && <Link href="/receivables/report" onClick={closeMenu}>รายงานการเงิน</Link>}
           <Link href="/pricing-calculator" onClick={closeMenu}>คำนวณราคาขาย</Link>
           <Link className="nav-cta-mobile" href={isAuthenticated ? "/account" : "/quotation"} onClick={closeMenu}>
             {isAuthenticated ? "บัญชีของฉัน" : "เริ่มสร้างเอกสาร"} <ArrowUpRight size={16} />
