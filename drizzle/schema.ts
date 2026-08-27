@@ -1,4 +1,4 @@
-import { decimal, index, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { decimal, index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -58,6 +58,22 @@ export const documentExports = mysqlTable("document_exports", {
   userDocumentCreatedIdx: index("document_exports_user_document_created_idx").on(table.userId, table.documentId, table.createdAt),
 }));
 
+export const receiptSources = mysqlTable("receipt_sources", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  receivableId: int("receivableId").notNull().references(() => receivables.id, { onDelete: "cascade" }),
+  invoiceId: int("invoiceId").notNull().references(() => savedDocuments.id, { onDelete: "cascade" }),
+  receiptDocumentId: int("receiptDocumentId").notNull().references(() => savedDocuments.id, { onDelete: "cascade" }),
+  activePaymentIds: text("activePaymentIds").notNull(),
+  paymentTotalAtCreation: decimal("paymentTotalAtCreation", { precision: 14, scale: 2 }).notNull(),
+  createdFrom: varchar("createdFrom", { length: 32 }).notNull().default("receivable-paid"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  receivableUnique: uniqueIndex("receipt_sources_receivable_unique").on(table.receivableId),
+  receiptDocumentUnique: uniqueIndex("receipt_sources_receipt_document_unique").on(table.receiptDocumentId),
+  userReceivableIdx: index("receipt_sources_user_receivable_idx").on(table.userId, table.receivableId),
+}));
+
 export const receivables = mysqlTable("receivables", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -99,7 +115,7 @@ export const receivableEvents = mysqlTable("receivable_events", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   receivableId: int("receivableId").notNull().references(() => receivables.id, { onDelete: "cascade" }),
-  type: mysqlEnum("type", ["created", "payment-recorded", "payment-voided", "payment-replaced"]).notNull(),
+  type: mysqlEnum("type", ["created", "payment-recorded", "payment-voided", "payment-replaced", "receipt-draft-created"]).notNull(),
   paymentId: int("paymentId").references(() => payments.id, { onDelete: "set null" }),
   amount: decimal("amount", { precision: 14, scale: 2 }),
   note: text("note"),
@@ -114,3 +130,4 @@ export type Receivable = typeof receivables.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type ReceivableEvent = typeof receivableEvents.$inferSelect;
 export type DocumentExport = typeof documentExports.$inferSelect;
+export type ReceiptSource = typeof receiptSources.$inferSelect;

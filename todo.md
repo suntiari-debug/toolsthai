@@ -43,3 +43,17 @@
 - [x] สร้างหน้ารายงานพร้อมตัวกรองวันอ้างอิง/เดือนและ export CSV ภาษาไทย
 - [x] เพิ่ม unit/browser QA สำหรับการคำนวณรายงานและไฟล์ CSV
 - [x] บันทึก checkpoint รายงานอายุลูกหนี้และ CSV หลังตรวจครบ
+- [x] ออกแบบ UI/UX ฟีเจอร์ออกใบเสร็จจากรายการรับชำระที่ชำระครบ
+- [x] ระบุ user flow, validation, empty/error/success states และ responsive behavior ของฟีเจอร์ออกใบเสร็จ
+- [x] จัดทำ implementation-ready UI specification และลำดับงานพัฒนาสำหรับสัปดาห์นี้
+- [x] ตรวจ inventory ฟีเจอร์เดิมและจัดลำดับช่องว่างก่อนเริ่มฟีเจอร์สัปดาห์นี้
+- [x] จัดทำ Prompt สั่งพัฒนา P0, P1 และ P2 สำหรับฟีเจอร์ที่ยังขาดของ Tools Thai
+- [x] ตรวจ receipt resume contract, document payload และ payment audit model ก่อนเพิ่ม schema
+- [x] เพิ่ม receipt source metadata และ unique idempotency contract ด้วย migration แบบ additive
+- [x] เพิ่ม protected owner-scoped API สำหรับ eligibility, create/open receipt draft และ source payment change status
+- [x] เพิ่ม Receipt Preparation Sheet จาก Dashboard และ Document Center พร้อม disabled state สำหรับยอดคงเหลือ
+- [x] เพิ่ม receipt editor source-context banner, payment-change warning และ receipt-created timeline event
+- [x] เพิ่ม tests และ browser QA สำหรับ paid/partial/non-owner/idempotency/source-change บน desktop และ mobile
+- [x] เพิ่ม Vitest ที่ยืนยัน receipt eligibility/create draft ปฏิเสธ receivable ของผู้ใช้อื่นโดยตรง
+- [x] เพิ่ม DB-helper integration test ที่พิสูจน์ cross-owner receipt rejection โดยไม่ mock ผลการปฏิเสธ
+- [ ] ตรวจ regression, commit/push และสร้าง checkpoint หลังฟีเจอร์ receipt draft ผ่าน QA

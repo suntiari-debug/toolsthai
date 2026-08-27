@@ -19,6 +19,7 @@ import { businessDocumentTemplates, documentFontChoices, documentFontSizeChoices
 import { createLogoPresetExport, filterLogoPresets, LEGACY_LOGO_PRESETS_STORAGE_KEY, LOGO_PRESETS_STORAGE_KEY, logoPresetCategories, MAX_LOGO_PRESET_IMPORT_BYTES, MAX_LOGO_PRESETS, mergeLogoPresets, parseLogoPresetImport, parseStoredPreviewHighlight, PREVIEW_HIGHLIGHT_PREFERENCE_STORAGE_KEY, sanitizeLogoPresets, serializeLogoPresets, type LogoPreset, type LogoPresetCategory } from "@/lib/documentPreferences";
 import { getItemPreviewHighlightTarget, getPreviewHighlightTarget, type PreviewHighlightTarget } from "@/lib/previewHighlight";
 import { sanitizePdfFilename } from "@/lib/pdfExport";
+import { parseReceiptSourceContext } from "@/lib/receiptDraft";
 import "../styles/document-typography.css";
 import { boundedPreviewZoom, clampPreviewPan, getAllPreviewZoomStorageKeys, getLegacyPreviewZoomStorageKey, getPreviewScrollBehavior, getPreviewScrollIndicator, getPreviewZoomDevice, getPreviewZoomStorageKey, isDoubleTap, parseStoredPreviewZoom, pinchZoomStep, PreviewPan, PreviewZoom, PreviewZoomDevice, TapPoint } from "@/lib/previewZoom";
 
@@ -96,6 +97,8 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
   const fontFamily = normalizeDocumentFontFamily(document.fontFamily);
   const fontSize = normalizeDocumentFontSize(document.fontSize);
   const pdfValidationIssues = useMemo(() => getDocumentValidationIssues(document), [document]);
+  const receiptSource = useMemo(() => kind === "receipt" ? parseReceiptSourceContext(JSON.stringify(document)) : null, [document, kind]);
+  const receiptSourceQuery = trpc.receivables.receiptEligibility.useQuery({ receivableId: receiptSource?.sourceReceivableId || 1 }, { enabled: isAuthenticated && receiptSource !== null, retry: false });
   const logoCrop = boundedLogoCrop(document.logoCrop);
   const previewZoomLabel = previewZoom === -1 ? "90%" : previewZoom === 1 ? "110%" : "100%";
   const previewHint = previewZoom === 1 ? "ลากหนึ่งนิ้วเพื่อเลื่อน · แตะสองครั้งเพื่อรีเซ็ต" : "ถ่างหรือหุบนิ้วสองนิ้วเพื่อซูม · แตะสองครั้งเพื่อรีเซ็ต";
@@ -518,6 +521,7 @@ export default function DocumentTool({ kind }: DocumentToolProps) {
           </div>
           <span className="autosave-status"><span>✓</span> บันทึกอัตโนมัติในอุปกรณ์</span>
         </div>
+        {receiptSource && <section className={receiptSourceQuery.data?.sourceChanged ? "receipt-source-context is-warning print-hide" : "receipt-source-context print-hide"} role={receiptSourceQuery.data?.sourceChanged ? "status" : undefined}><div><ShieldCheck size={18} /><span><strong>สร้างจากใบแจ้งหนี้ {receiptSource.sourceInvoiceNumber}</strong><small>รับชำระครบ {formatTHB(Number(receiptSource.paymentTotalAtCreation))} · {receiptSource.activePaymentIds.length} รายการรับชำระ</small></span></div>{receiptSourceQuery.data?.sourceChanged ? <div className="receipt-source-context-warning"><Info size={16} /> ข้อมูลการรับชำระเปลี่ยนแล้ว <Link href="/receivables">ตรวจ timeline</Link></div> : <Link href="/receivables" className="receipt-source-context-link">ดูรายการรับชำระ</Link>}</section>}
         {notice && <div className="draft-toast print-hide"><ShieldCheck size={17} /> {notice}</div>}
         {pdfExportStage && <div className="pdf-export-status" role="status" aria-live="polite"><div className="pdf-export-orbit" aria-hidden="true"><i /><i /><i /></div><div><strong>{pdfExportStage === "preparing" ? "กำลังเตรียมเอกสาร" : pdfExportStage === "rendering" ? "กำลังเรนเดอร์ PDF" : "กำลังเริ่มดาวน์โหลด"}</strong><span>{pdfExportStage === "preparing" ? "ตรวจสอบรูปแบบและข้อมูลเอกสาร" : pdfExportStage === "rendering" ? "กำลังจัดวางเอกสารให้พร้อมดาวน์โหลด" : "ไฟล์ PDF จะถูกบันทึกลงในอุปกรณ์ของคุณ"}</span></div></div>}
         <AlertDialog open={isPdfValidationOpen} onOpenChange={setIsPdfValidationOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ตรวจข้อมูลสำคัญก่อนดาวน์โหลด PDF</AlertDialogTitle><AlertDialogDescription>พบข้อมูลที่ควรตรวจทานก่อนสร้าง PDF คุณสามารถกลับไปแก้ไข หรือดาวน์โหลดต่อได้หากยืนยันว่าข้อมูลถูกต้องแล้ว</AlertDialogDescription></AlertDialogHeader><ul className="pdf-validation-list">{pdfValidationIssues.map((issue) => <li key={issue.id}><strong>{issue.label}</strong><span>{issue.message}</span></li>)}</ul><AlertDialogFooter><AlertDialogCancel>กลับไปแก้ไข</AlertDialogCancel><AlertDialogAction onClick={() => { setIsPdfValidationOpen(false); openPdfConfirmation(); }}>ตรวจ preview และดาวน์โหลด</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>

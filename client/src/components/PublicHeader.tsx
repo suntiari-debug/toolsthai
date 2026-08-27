@@ -4,6 +4,7 @@ import { useState } from "react";
 import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import BrandMark from "./BrandMark";
+import { ReceiptPreparationMenu, ReceiptPreparationPortal } from "./ReceiptPreparationSheet";
 
 export default function PublicHeader() {
   const [isOpen, setIsOpen] = useState(false);
@@ -12,6 +13,7 @@ export default function PublicHeader() {
   const closeMenu = () => setIsOpen(false);
 
   return (
+    <>
     <header className="public-header">
       <div className="shell nav-shell">
         <Link href="/" onClick={closeMenu}><BrandMark /></Link>
@@ -21,6 +23,7 @@ export default function PublicHeader() {
           <a href="/#why-tools-thai" onClick={closeMenu}>ทำไมต้อง Tools Thai</a>
           {isAuthenticated && <Link href="/documents" onClick={closeMenu}>คลังเอกสาร</Link>}
           {isAuthenticated && <Link href="/receivables/report" onClick={closeMenu}>รายงานการเงิน</Link>}
+          {isAuthenticated && <ReceiptPreparationMenu />}
           <Link href="/pricing-calculator" onClick={closeMenu}>คำนวณราคาขาย</Link>
           <Link className="nav-cta-mobile" href={isAuthenticated ? "/account" : "/quotation"} onClick={closeMenu}>
             {isAuthenticated ? "บัญชีของฉัน" : "เริ่มสร้างเอกสาร"} <ArrowUpRight size={16} />
@@ -38,5 +41,7 @@ export default function PublicHeader() {
         </button>
       </div>
     </header>
+    <ReceiptPreparationPortal />
+    </>
   );
 }

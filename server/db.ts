@@ -1,8 +1,8 @@
 import { and, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { companyProfiles, documentExports, InsertUser, payments, receivableEvents, receivables, savedDocuments, users } from "../drizzle/schema";
+import { companyProfiles, documentExports, InsertUser, payments, receivableEvents, receivables, receiptSources, savedDocuments, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
-import { buildReceivableActivityEvent, calculateInvoiceTotal, deriveReceivableStatus, parseDateOnly, parseInvoicePayload, validatePaymentAmount } from "./receivables";
+import { buildReceivableActivityEvent, calculateInvoiceTotal, centsToMoney, deriveReceivableStatus, getReceiptDraftEligibility, hasReceiptSourcePaymentChanged, moneyToCents, parseDateOnly, parseInvoicePayload, validatePaymentAmount } from "./receivables";
 import { buildReceivableAgingReport, getMonthBounds } from "./agingReport";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -17,6 +17,11 @@ export async function getDb() {
     }
   }
   return _db;
+}
+
+/** Test-only seam for transaction-scoped integration fixtures; never used by routers or client code. */
+export function __setDbForTests(instance: ReturnType<typeof drizzle> | null) {
+  _db = instance;
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
@@ -177,6 +182,101 @@ export async function getReceivableByInvoice(userId: number, invoiceId: number) 
   if (!db) return undefined;
   const result = await db.select({ id: receivables.id }).from(receivables).where(and(eq(receivables.userId, userId), eq(receivables.invoiceId, invoiceId))).limit(1);
   return result[0] ? getReceivableDetails(userId, result[0].id) : undefined;
+}
+
+type ReceiptPaymentMethod = "cash" | "transfer" | "card" | "cheque" | "other";
+type ReceiptSourcePayload = { sourceInvoiceId: number; sourceReceivableId: number; activePaymentIds: number[]; paymentTotalAtCreation: string; createdFrom: "receivable-paid"; sourceInvoiceNumber: string };
+
+function buildReceiptNumber(receivableId: number, now = new Date()) {
+  return `RC-${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}-${String(receivableId).padStart(4, "0")}`;
+}
+
+function serializePaymentIds(ids: number[]) {
+  return JSON.stringify([...ids].sort((left, right) => left - right));
+}
+
+function parsePaymentIds(value: string) {
+  try {
+    const ids = JSON.parse(value);
+    return Array.isArray(ids) && ids.every((id) => Number.isInteger(id) && id > 0) ? ids : [];
+  } catch {
+    return [];
+  }
+}
+
+function buildReceiptPayload(invoicePayload: string, receiptNumber: string, source: ReceiptSourcePayload) {
+  const invoice = parseInvoicePayload(invoicePayload) as Record<string, unknown>;
+  const today = new Date().toISOString().slice(0, 10);
+  return JSON.stringify({ ...invoice, kind: "receipt", documentNumber: receiptNumber, issueDate: today, dueDate: today, receiptSource: source });
+}
+
+export async function getReceiptEligibility(userId: number, receivableId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const receivableRows = await db.select({ id: receivables.id, invoiceId: receivables.invoiceId, documentNumber: receivables.documentNumber, customerName: receivables.customerName, totalAmount: receivables.totalAmount, paidAmount: receivables.paidAmount, dueDate: receivables.dueDate, status: receivables.status }).from(receivables).where(and(eq(receivables.id, receivableId), eq(receivables.userId, userId))).limit(1);
+  const receivable = receivableRows[0];
+  if (!receivable) throw new Error("ไม่พบรายการลูกหนี้ของผู้ใช้รายนี้");
+  const invoice = await getSavedDocument(userId, receivable.invoiceId);
+  if (!invoice || invoice.kind !== "invoice") throw new Error("ไม่พบใบแจ้งหนี้ต้นทางของผู้ใช้รายนี้");
+  const activePayments = await db.select({ id: payments.id, amount: payments.amount, paidAt: payments.paidAt, method: payments.method, reference: payments.reference }).from(payments).where(and(eq(payments.userId, userId), eq(payments.receivableId, receivable.id), isNull(payments.voidedAt))).orderBy(payments.paidAt);
+  const activePaymentIds = activePayments.map((payment) => payment.id).sort((left, right) => left - right);
+  const paymentTotal = centsToMoney(activePayments.reduce((sum, payment) => sum + moneyToCents(payment.amount), 0));
+  const totalMatches = moneyToCents(paymentTotal) === moneyToCents(receivable.totalAmount);
+  const currentStatus = deriveReceivableStatus(receivable.totalAmount, paymentTotal, receivable.dueDate);
+  const sourceRows = await db.select({ receiptDocumentId: receiptSources.receiptDocumentId, activePaymentIds: receiptSources.activePaymentIds, paymentTotalAtCreation: receiptSources.paymentTotalAtCreation, createdAt: receiptSources.createdAt }).from(receiptSources).where(and(eq(receiptSources.userId, userId), eq(receiptSources.receivableId, receivable.id))).limit(1);
+  const source = sourceRows[0];
+  const receiptDraft = source ? await getSavedDocument(userId, source.receiptDocumentId) : undefined;
+  const sourceChanged = Boolean(source && hasReceiptSourcePaymentChanged(parsePaymentIds(source.activePaymentIds), activePaymentIds, source.paymentTotalAtCreation, paymentTotal));
+  const eligibility = getReceiptDraftEligibility(receivable.status === "cancelled" ? "cancelled" : currentStatus, receivable.totalAmount, paymentTotal);
+  const eligible = eligibility.eligible && totalMatches;
+  return {
+    eligible,
+    reason: eligible ? null : eligibility.reason,
+    receivable: { ...receivable, status: currentStatus, paymentTotal, outstanding: centsToMoney(Math.max(0, moneyToCents(receivable.totalAmount) - moneyToCents(paymentTotal))) },
+    invoice: { id: invoice.id, documentNumber: invoice.documentNumber, customerName: invoice.customerName, payload: invoice.payload },
+    payments: activePayments.map((payment) => ({ ...payment, method: payment.method as ReceiptPaymentMethod })),
+    receiptDraft: receiptDraft ? { id: receiptDraft.id, documentNumber: receiptDraft.documentNumber, payload: receiptDraft.payload, createdAt: source?.createdAt ?? receiptDraft.createdAt } : null,
+    sourceChanged,
+  };
+}
+
+export async function createReceiptDraft(userId: number, receivableId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  try {
+    return await db.transaction(async (tx) => {
+      const existingSource = await tx.select({ receiptDocumentId: receiptSources.receiptDocumentId }).from(receiptSources).where(and(eq(receiptSources.userId, userId), eq(receiptSources.receivableId, receivableId))).limit(1);
+      if (existingSource[0]) {
+        const existingReceipt = await tx.select({ id: savedDocuments.id, documentNumber: savedDocuments.documentNumber, payload: savedDocuments.payload, createdAt: savedDocuments.createdAt }).from(savedDocuments).where(and(eq(savedDocuments.id, existingSource[0].receiptDocumentId), eq(savedDocuments.userId, userId), eq(savedDocuments.kind, "receipt"))).limit(1);
+        if (existingReceipt[0]) return { ...existingReceipt[0], created: false };
+        throw new Error("ไม่พบใบเสร็จฉบับร่างที่เชื่อมกับรายการรับชำระ");
+      }
+      const receivableRows = await tx.select({ id: receivables.id, invoiceId: receivables.invoiceId, documentNumber: receivables.documentNumber, customerName: receivables.customerName, totalAmount: receivables.totalAmount, dueDate: receivables.dueDate, status: receivables.status }).from(receivables).where(and(eq(receivables.id, receivableId), eq(receivables.userId, userId))).limit(1);
+      const receivable = receivableRows[0];
+      if (!receivable) throw new Error("ไม่พบรายการลูกหนี้ของผู้ใช้รายนี้");
+      if (receivable.status === "cancelled") throw new Error("รายการลูกหนี้นี้ถูกยกเลิกแล้ว");
+      const invoiceRows = await tx.select({ id: savedDocuments.id, documentNumber: savedDocuments.documentNumber, customerName: savedDocuments.customerName, payload: savedDocuments.payload }).from(savedDocuments).where(and(eq(savedDocuments.id, receivable.invoiceId), eq(savedDocuments.userId, userId), eq(savedDocuments.kind, "invoice"))).limit(1);
+      const invoice = invoiceRows[0];
+      if (!invoice) throw new Error("ไม่พบใบแจ้งหนี้ต้นทางของผู้ใช้รายนี้");
+      const activePayments = await tx.select({ id: payments.id, amount: payments.amount }).from(payments).where(and(eq(payments.userId, userId), eq(payments.receivableId, receivable.id), isNull(payments.voidedAt))).orderBy(payments.id);
+      const paymentTotal = centsToMoney(activePayments.reduce((sum, payment) => sum + moneyToCents(payment.amount), 0));
+      const eligibility = getReceiptDraftEligibility(deriveReceivableStatus(receivable.totalAmount, paymentTotal, receivable.dueDate), receivable.totalAmount, paymentTotal);
+      if (!eligibility.eligible) throw new Error(eligibility.reason);
+      const receiptNumber = buildReceiptNumber(receivable.id);
+      const source: ReceiptSourcePayload = { sourceInvoiceId: invoice.id, sourceReceivableId: receivable.id, activePaymentIds: activePayments.map((payment) => payment.id), paymentTotalAtCreation: paymentTotal, createdFrom: "receivable-paid", sourceInvoiceNumber: invoice.documentNumber };
+      const payload = buildReceiptPayload(invoice.payload, receiptNumber, source);
+      const receiptInsert = await tx.insert(savedDocuments).values({ userId, kind: "receipt", documentNumber: receiptNumber, customerName: invoice.customerName || receivable.customerName, payload, status: "draft" });
+      const receiptDocumentId = Number(receiptInsert[0].insertId);
+      await tx.insert(receiptSources).values({ userId, receivableId: receivable.id, invoiceId: invoice.id, receiptDocumentId, activePaymentIds: serializePaymentIds(source.activePaymentIds), paymentTotalAtCreation: paymentTotal, createdFrom: source.createdFrom });
+      await tx.insert(receivableEvents).values(buildReceivableActivityEvent({ userId, receivableId: receivable.id, type: "receipt-draft-created", amount: paymentTotal, note: `สร้างใบเสร็จร่าง ${receiptNumber} จากใบแจ้งหนี้ ${invoice.documentNumber}` }));
+      return { id: receiptDocumentId, documentNumber: receiptNumber, payload, createdAt: new Date(), created: true };
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code !== "ER_DUP_ENTRY") throw error;
+    const eligibility = await getReceiptEligibility(userId, receivableId);
+    if (eligibility.receiptDraft) return { ...eligibility.receiptDraft, created: false };
+    throw error;
+  }
 }
 
 export async function getReceivableAgingReport(userId: number, input: { asOf: Date; month: string }) {

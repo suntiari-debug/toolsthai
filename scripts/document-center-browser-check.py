@@ -12,7 +12,7 @@ VIEWPORT = {"width": int(os.environ.get("TOOLSTHAI_VIEWPORT_WIDTH", "1280")), "h
 NOW = 1787792400000
 user = {"id": 41, "openId": "fixture-owner", "email": "owner@example.com", "name": "Fixture Owner", "loginMethod": "manus", "role": "user", "createdAt": NOW, "updatedAt": NOW, "lastSignedIn": NOW}
 payload = json.dumps({"kind": "invoice", "documentNumber": "IV-FIXTURE-001", "issueDate": "2026-08-27", "dueDate": "2026-09-03", "company": {"name": "Tools Thai Demo", "address": "กรุงเทพฯ", "taxId": "", "phone": "", "email": "", "logoUrl": ""}, "customer": {"name": "ACME Thailand", "address": "กรุงเทพฯ", "taxId": "", "contact": ""}, "items": [{"id": "fixture-item", "name": "บริการรายเดือน", "description": "", "quantity": 1, "unit": "รายการ", "unitPrice": 1000}], "discount": 0, "vatRate": 7, "vatMode": "excluded", "note": "ขอบคุณที่ใช้บริการ", "watermark": False})
-state = {"status": "draft", "archived": False, "duplicated": False, "exports": []}
+state = {"status": "draft", "archived": False, "duplicated": False, "exports": [], "receiptDraft": None}
 
 
 def documents():
@@ -44,7 +44,12 @@ def response_for(procedure):
         state["exports"].append({"id": 30, "filename": "ใบแจ้งหนี้-ACME.pdf", "createdAt": NOW})
         return {"documentId": 8}
     if procedure == "receivables.getByInvoice":
-        return {"id": 101, "invoiceId": 8, "documentNumber": "IV-FIXTURE-001", "totalAmount": "1000.00", "paidAmount": "400.00", "status": "partial", "events": [{"id": 602, "type": "payment-recorded", "paymentId": 501, "amount": "400.00", "note": "โอนแล้ว", "createdAt": NOW}, {"id": 601, "type": "created", "paymentId": None, "amount": "1000.00", "note": "เพิ่มจากใบแจ้งหนี้", "createdAt": NOW}]}
+        return {"id": 101, "invoiceId": 8, "documentNumber": "IV-FIXTURE-001", "totalAmount": "1070.00", "paidAmount": "1070.00", "status": "paid", "events": [{"id": 602, "type": "payment-recorded", "paymentId": 501, "amount": "1070.00", "note": "โอนแล้ว", "createdAt": NOW}, {"id": 601, "type": "created", "paymentId": None, "amount": "1070.00", "note": "เพิ่มจากใบแจ้งหนี้", "createdAt": NOW}]}
+    if procedure == "receivables.receiptEligibility":
+        return {"eligible": True, "reason": None, "receivable": {"id": 101, "totalAmount": "1070.00", "paymentTotal": "1070.00", "outstanding": "0.00"}, "invoice": {"id": 8, "documentNumber": "IV-FIXTURE-001", "customerName": "ACME Thailand", "payload": payload}, "payments": [{"id": 501, "amount": "1070.00", "paidAt": NOW, "method": "transfer", "reference": "TRX-001"}], "receiptDraft": state["receiptDraft"], "sourceChanged": False}
+    if procedure == "receivables.createReceiptDraft":
+        state["receiptDraft"] = {"id": 77, "documentNumber": "RC-FIXTURE-001", "payload": payload, "createdAt": NOW}
+        return {**state["receiptDraft"], "created": True}
     if procedure == "companyProfile.get":
         return None
     return None
@@ -81,8 +86,13 @@ with sync_playwright() as playwright:
     page.get_by_role("button", name="รับชำระ", exact=True).first.click()
     receivable_dialog = page.get_by_role("dialog")
     receivable_dialog.get_by_text("ยอดคงเหลือ").wait_for(state="visible", timeout=5000)
-    receivable_dialog.get_by_text("ชำระบางส่วน").wait_for(state="visible", timeout=5000)
+    receivable_dialog.get_by_text("ชำระครบ", exact=True).wait_for(state="visible", timeout=5000)
     receivable_dialog.get_by_text("บันทึกการรับชำระ").wait_for(state="visible", timeout=5000)
+    receivable_dialog.get_by_role("button", name="เปิดฉบับร่างใบเสร็จ").click()
+    receipt_sheet = page.get_by_role("dialog", name="เตรียมออกใบเสร็จ")
+    receipt_sheet.get_by_text("ชำระครบแล้ว").wait_for(state="visible", timeout=5000)
+    receipt_sheet.get_by_text("IV-FIXTURE-001").wait_for(state="visible", timeout=5000)
+    receipt_sheet.get_by_role("button", name="ยังไม่ออกตอนนี้").click()
     receivable_dialog.get_by_role("button", name="ปิดสถานะรับชำระ").click()
     page.get_by_role("button", name="แก้ไข").first.click()
     pdf_trigger = page.get_by_role("button", name="ดาวน์โหลด PDF").first
@@ -106,5 +116,5 @@ with sync_playwright() as playwright:
     page.get_by_text("ส่งออก PDF 1 ครั้ง", exact=False).wait_for(state="visible", timeout=8000)
     page.get_by_role("button", name="PDF", exact=True).first.click()
     page.get_by_text("ใบแจ้งหนี้-ACME.pdf").wait_for(state="visible", timeout=5000)
-    print(json.dumps({"documentCenter": "filter-status-duplicate-archive-resume", "receivableLinkage": "invoice-balance-and-timeline", "pdfConfirmation": "filename-and-live-preview", "pdfDownload": download.suggested_filename, "exportHistory": len(state["exports"])}, ensure_ascii=False))
+    print(json.dumps({"documentCenter": "filter-status-duplicate-archive-resume", "receivableLinkage": "invoice-balance-timeline-and-receipt-sheet", "pdfConfirmation": "filename-and-live-preview", "pdfDownload": download.suggested_filename, "exportHistory": len(state["exports"])}, ensure_ascii=False))
     browser.close()

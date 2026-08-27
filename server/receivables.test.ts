@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import * as db from "./db";
-import { buildReceivableActivityEvent, calculateInvoiceTotal, deriveReceivableStatus, validatePaymentAmount } from "./receivables";
+import { buildReceivableActivityEvent, calculateInvoiceTotal, deriveReceivableStatus, getReceiptDraftEligibility, hasReceiptSourcePaymentChanged, validatePaymentAmount } from "./receivables";
 import { afterEach, vi } from "vitest";
 
 const invoice = {
@@ -35,6 +35,18 @@ describe("receivables business rules", () => {
   it("rejects overpayment and accepts payment up to the balance", () => {
     expect(validatePaymentAmount("1000.00", "250.00", "800.01")).toMatchObject({ valid: false });
     expect(validatePaymentAmount("1000.00", "250.00", "750.00")).toMatchObject({ valid: true, amountCents: 75000, outstandingCents: 75000 });
+  });
+
+  it("allows receipt drafts only when active payments settle a non-cancelled receivable", () => {
+    expect(getReceiptDraftEligibility("paid", "1000.00", "1000.00")).toEqual({ eligible: true, reason: null });
+    expect(getReceiptDraftEligibility("partial", "1000.00", "400.00")).toEqual({ eligible: false, reason: "ออกใบเสร็จได้เมื่อยอดคงเหลือเป็น ฿0.00" });
+    expect(getReceiptDraftEligibility("cancelled", "1000.00", "1000.00")).toEqual({ eligible: false, reason: "รายการลูกหนี้นี้ถูกยกเลิกแล้ว" });
+  });
+
+  it("flags a receipt source warning when active payment identities or the settled total change", () => {
+    expect(hasReceiptSourcePaymentChanged([71, 72], [72, 71], "1000.00", "1000.00")).toBe(false);
+    expect(hasReceiptSourcePaymentChanged([71, 72], [73], "1000.00", "1000.00")).toBe(true);
+    expect(hasReceiptSourcePaymentChanged([71, 72], [71, 72], "1000.00", "900.00")).toBe(true);
   });
 
   it("preserves the authenticated owner and normalized money in activity events", () => {
@@ -105,5 +117,28 @@ describe("receivables router access", () => {
     const ctx = { user: { id: 321, openId: "owner-321", name: "Owner", email: "owner@example.com", loginMethod: "test", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] } as TrpcContext;
     await expect(appRouter.createCaller(ctx).receivables.agingReport({ asOf: "2026-08-31", month: "2026-08" })).resolves.toMatchObject({ month: "2026-08" });
     expect(getReceivableAgingReport).toHaveBeenCalledWith(321, { asOf: new Date("2026-08-31T00:00:00.000Z"), month: "2026-08" });
+  });
+
+  it("uses the authenticated owner for receipt eligibility and receipt draft creation", async () => {
+    const getReceiptEligibility = vi.spyOn(db, "getReceiptEligibility").mockResolvedValue({ eligible: true, reason: null, receivable: { id: 19 }, invoice: { id: 8 }, payments: [], receiptDraft: null, sourceChanged: false } as never);
+    const createReceiptDraft = vi.spyOn(db, "createReceiptDraft").mockResolvedValue({ id: 77, documentNumber: "RC-202608-0019", payload: "{}", createdAt: new Date(), created: true });
+    const ctx = { user: { id: 321, openId: "owner-321", name: "Owner", email: "owner@example.com", loginMethod: "test", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] } as TrpcContext;
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.receivables.receiptEligibility({ receivableId: 19 })).resolves.toMatchObject({ eligible: true });
+    await expect(caller.receivables.createReceiptDraft({ receivableId: 19 })).resolves.toMatchObject({ id: 77, created: true });
+    expect(getReceiptEligibility).toHaveBeenCalledWith(321, 19);
+    expect(createReceiptDraft).toHaveBeenCalledWith(321, 19);
+  });
+
+  it("rejects receipt draft access when the receivable is not owned by the authenticated caller", async () => {
+    const denied = new Error("ไม่พบรายการลูกหนี้ของผู้ใช้รายนี้");
+    const getReceiptEligibility = vi.spyOn(db, "getReceiptEligibility").mockImplementation(async (userId) => { if (userId !== 321) throw denied; return { eligible: true } as never; });
+    const createReceiptDraft = vi.spyOn(db, "createReceiptDraft").mockImplementation(async (userId) => { if (userId !== 321) throw denied; return { id: 77 } as never; });
+    const otherUser = { user: { id: 999, openId: "other-owner", name: "Other", email: "other@example.com", loginMethod: "test", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] } as TrpcContext;
+    const caller = appRouter.createCaller(otherUser);
+    await expect(caller.receivables.receiptEligibility({ receivableId: 19 })).rejects.toThrow("ไม่พบรายการลูกหนี้ของผู้ใช้รายนี้");
+    await expect(caller.receivables.createReceiptDraft({ receivableId: 19 })).rejects.toThrow("ไม่พบรายการลูกหนี้ของผู้ใช้รายนี้");
+    expect(getReceiptEligibility).toHaveBeenCalledWith(999, 19);
+    expect(createReceiptDraft).toHaveBeenCalledWith(999, 19);
   });
 });

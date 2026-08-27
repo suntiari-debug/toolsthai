@@ -71,7 +71,20 @@ export function validatePaymentAmount(totalAmount: number | string, paidAmount: 
   return { valid: true as const, amountCents, outstandingCents };
 }
 
-export function buildReceivableActivityEvent(input: { userId: number; receivableId: number; type: "created" | "payment-recorded" | "payment-voided" | "payment-replaced"; paymentId?: number | null; amount?: number | string | null; note?: string | null }) {
+export function getReceiptDraftEligibility(status: ReceivableStatus, totalAmount: number | string, activePaymentTotal: number | string) {
+  if (status === "cancelled") return { eligible: false as const, reason: "รายการลูกหนี้นี้ถูกยกเลิกแล้ว" };
+  if (moneyToCents(totalAmount) <= 0 || moneyToCents(activePaymentTotal) !== moneyToCents(totalAmount)) return { eligible: false as const, reason: "ออกใบเสร็จได้เมื่อยอดคงเหลือเป็น ฿0.00" };
+  return { eligible: true as const, reason: null };
+}
+
+export function hasReceiptSourcePaymentChanged(createdPaymentIds: number[], paymentIdsNow: number[], paymentTotalAtCreation: number | string, paymentTotalNow: number | string) {
+  const normalizeIds = (ids: number[]) => [...ids].filter((id) => Number.isInteger(id) && id > 0).sort((left, right) => left - right);
+  const created = normalizeIds(createdPaymentIds);
+  const current = normalizeIds(paymentIdsNow);
+  return created.length !== current.length || created.some((id, index) => id !== current[index]) || moneyToCents(paymentTotalAtCreation) !== moneyToCents(paymentTotalNow);
+}
+
+export function buildReceivableActivityEvent(input: { userId: number; receivableId: number; type: "created" | "payment-recorded" | "payment-voided" | "payment-replaced" | "receipt-draft-created"; paymentId?: number | null; amount?: number | string | null; note?: string | null }) {
   return {
     userId: input.userId,
     receivableId: input.receivableId,
